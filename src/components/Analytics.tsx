@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, PieChart as PieChartIcon, Calendar, Download } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import api from '../services/api';
+import FraudHeatmap from './FraudHeatmap';
 
 const mockTimeline = [
   { name: 'Mon', fraud: 4000, legit: 24000 },
@@ -40,6 +41,32 @@ export default function Analytics() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const filterByRange = (data: typeof mockTimeline, range: string) => {
+      if (range === '7d')  return data.slice(-7);
+      if (range === '30d') return data;
+      if (range === '90d') return Array.from({length: 13}, (_, i) => ({
+        name: `W${i+1}`,
+        fraud: Math.floor(Math.random() * 5000) + 1000,
+        legit: Math.floor(Math.random() * 50000) + 10000,
+      }));
+      return data;
+    };
+    setTimelineData(filterByRange(mockTimeline, dateRange));
+  }, [dateRange]);
+
+  const exportCSV = (data: typeof timelineData) => {
+    const header = 'Period,Fraud,Legitimate\n';
+    const rows = data.map(d => `${d.name},${d.fraud},${d.legit}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fraud-report-${dateRange}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const tooltipStyle = {
     backgroundColor: 'rgba(15, 23, 42, 0.95)',
     border: '1px solid rgba(56,189,248,0.2)',
@@ -73,7 +100,11 @@ export default function Analytics() {
             <option value="30d">Last 30 Days</option>
             <option value="90d">Last 90 Days</option>
           </select>
-          <button className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--muted)' }}>
+          <button 
+            onClick={() => exportCSV(timelineData)}
+            className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5" 
+            style={{ color: 'var(--muted)' }}
+          >
             <Download className="w-4 h-4" /> Export Report
           </button>
         </div>
@@ -170,6 +201,16 @@ export default function Analytics() {
             </motion.div>
           ))}
         </div>
+      </motion.div>
+
+      {/* Fraud Heatmap */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.6 }}
+        className="mt-6"
+      >
+        <FraudHeatmap />
       </motion.div>
     </motion.div>
   );

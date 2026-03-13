@@ -1,7 +1,69 @@
 import { motion } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity, Loader2 } from 'lucide-react';
+import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import api from '../services/api';
+
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+
+const LIME_BY_TYPE: Record<string, { label: string; width: string; color: string }[]> = {
+  'Account Takeover':  [
+    { label: 'Location',  width: '92%', color: '#f43f5e' },
+    { label: 'Velocity',  width: '85%', color: '#f43f5e' },
+    { label: 'Amount',    width: '78%', color: '#f59e0b' },
+    { label: 'Device',    width: '65%', color: '#f59e0b' },
+  ],
+  'SIM Swap': [
+    { label: 'New Device', width: '96%', color: '#f43f5e' },
+    { label: 'Hour (3am)', width: '88%', color: '#f43f5e' },
+    { label: 'Amount',     width: '71%', color: '#f59e0b' },
+    { label: 'Velocity',   width: '44%', color: '#f59e0b' },
+  ],
+  'Card Testing': [
+    { label: 'Velocity',   width: '98%', color: '#f43f5e' },
+    { label: 'Amount',     width: '45%', color: '#f59e0b' },
+    { label: 'Merchant',   width: '38%', color: '#f59e0b' },
+    { label: 'Device',     width: '22%', color: '#94a3b8' },
+  ],
+  'Money Mule': [
+    { label: 'Recipient',  width: '89%', color: '#f43f5e' },
+    { label: 'Network',    width: '82%', color: '#f43f5e' },
+    { label: 'Amount',     width: '67%', color: '#f59e0b' },
+    { label: 'Velocity',   width: '51%', color: '#f59e0b' },
+  ],
+  'Suspicious': [
+    { label: 'Velocity',   width: '72%', color: '#f43f5e' },
+    { label: 'Device',     width: '61%', color: '#f59e0b' },
+    { label: 'Amount',     width: '48%', color: '#f59e0b' },
+    { label: 'Hour',       width: '35%', color: '#94a3b8' },
+  ],
+  'Phishing': [
+    { label: 'Recipient',  width: '89%', color: '#f43f5e' },
+    { label: 'Network',    width: '75%', color: '#f43f5e' },
+    { label: 'Amount',     width: '62%', color: '#f59e0b' },
+    { label: 'Time',       width: '48%', color: '#f59e0b' },
+  ],
+};
+
+const SHAP_BY_TYPE: Record<string, number[]> = {
+  'Account Takeover':  [0.2, 0.85, 0.9, 0.7, 0.4, 0.3, 0.6, 0.5],
+  'SIM Swap':          [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
+  'Card Testing':      [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
+  'Money Mule':        [0.3, 0.2, 0.2, 0.4, 0.9, 0.8, 0.3, 0.2],
+  'Phishing':          [0.3, 0.5, 0.6, 0.6, 0.85, 0.4, 0.5, 0.3],
+  'Suspicious':        [0.5, 0.5, 0.5, 0.5, 0.5, 0.4, 0.4, 0.3],
+};
+
+const SHAP_LABELS = [
+  'Velocity','Device','Time','Amount',
+  'Recipient','Network','Identity','Location'
+];
+
+const FINGERPRINTS = {
+  velocity_attack:    [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
+  sim_swap:           [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
+  social_engineering: [0.1, 0.3, 0.7, 0.6, 0.9, 0.2, 0.3, 0.2],
+};
 
 const mockCases = [
   { $id: 'c1', id: 'CASE-8842', priority: 95, amount: '₹1,20,000', type: 'Account Takeover', time: '5m ago', status: 'URGENT', description: 'Multiple unauthorized login attempts followed by large transfer' },
@@ -15,6 +77,81 @@ export default function Investigation() {
   const [cases, setCases] = useState(mockCases);
   const [selectedCase, setSelectedCase] = useState(mockCases[0]);
   const [loading, setLoading] = useState(true);
+  const chartRef = useRef<ChartJS<'radar'> | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const limeBars = LIME_BY_TYPE[selectedCase.type] || LIME_BY_TYPE['Suspicious'];
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    const shapData = SHAP_BY_TYPE[selectedCase.type] || SHAP_BY_TYPE['Suspicious'];
+
+    chartRef.current = new ChartJS(ctx, {
+      type: 'radar',
+      data: {
+        labels: SHAP_LABELS,
+        datasets: [
+          {
+            label: selectedCase.type,
+            data: shapData,
+            borderColor: '#f43f5e',
+            backgroundColor: 'rgba(244,63,94,0.15)',
+            borderWidth: 2,
+            pointRadius: 3,
+          },
+          {
+            label: 'Velocity pattern',
+            data: FINGERPRINTS.velocity_attack,
+            borderColor: 'rgba(251,113,133,0.4)',
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderDash: [4,4],
+            pointRadius: 0,
+          },
+          {
+            label: 'SIM Swap pattern',
+            data: FINGERPRINTS.sim_swap,
+            borderColor: 'rgba(251,191,36,0.4)',
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderDash: [4,4],
+            pointRadius: 0,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            min: 0,
+            max: 1,
+            ticks: { display: false },
+            grid: { color: 'rgba(148,163,184,0.15)' },
+            pointLabels: {
+              color: '#94a3b8',
+              font: { size: 10 }
+            }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+      }
+    };
+  }, [selectedCase.$id]);
 
   useEffect(() => {
     async function fetchCases() {
@@ -159,7 +296,7 @@ export default function Investigation() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-3 gap-6 mb-8">
               <div className="glass-card p-5 rounded-xl">
                 <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--muted)' }}>Transaction Details</h4>
                 <div className="space-y-3">
@@ -182,12 +319,8 @@ export default function Investigation() {
 
               <div className="glass-card p-5 rounded-xl">
                 <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
-                <div className="w-full space-y-3 mt-3">
-                  {[
-                    { label: 'Velocity', width: '85%', color: '#f43f5e' },
-                    { label: 'Location', width: '92%', color: '#f43f5e' },
-                    { label: 'Amount', width: '60%', color: '#f59e0b' },
-                  ].map(bar => (
+                <div className="w-full space-y-3 mt-3" key={selectedCase.$id}>
+                  {limeBars.map(bar => (
                     <div key={bar.label} className="flex items-center gap-2">
                       <span className="text-xs w-24 text-right" style={{ color: 'var(--muted)' }}>{bar.label}</span>
                       <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
@@ -201,6 +334,13 @@ export default function Investigation() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="glass-card p-5 rounded-xl">
+                <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>SHAP Fraud DNA</h4>
+                <div className="h-[200px]">
+                  <canvas ref={canvasRef} />
                 </div>
               </div>
             </div>

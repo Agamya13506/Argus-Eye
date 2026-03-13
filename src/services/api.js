@@ -1,5 +1,11 @@
 const API_BASE = 'http://localhost:3002/api';
 
+import { Client } from 'appwrite';
+
+export const appwriteClient = new Client()
+  .setEndpoint('https://nyc.cloud.appwrite.io/v1')
+  .setProject('69b423e1001873687a8d');
+
 export const api = {
   // Health check
   async health() {
@@ -119,6 +125,46 @@ export const api = {
     } catch (e) {
       console.error('Compliance API error:', e);
       return [];
+    }
+  },
+
+  // Threat actions
+  async confirmThreat(id) {
+    try {
+      const res = await fetch(`${API_BASE}/threats/${id}/confirm`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('Confirm threat error:', e);
+      return null;
+    }
+  },
+
+  async blocklistThreat(id) {
+    try {
+      const res = await fetch(`${API_BASE}/threats/${id}/blocklist`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('Blocklist threat error:', e);
+      return null;
+    }
+  },
+
+  async dismissThreat(id) {
+    try {
+      const res = await fetch(`${API_BASE}/threats/${id}/dismiss`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('Dismiss threat error:', e);
+      return null;
     }
   }
 };

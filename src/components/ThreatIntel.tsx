@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { ShieldAlert, Users, Shield, AlertTriangle, CheckCircle2, Search, Loader2 } from 'lucide-react';
-import api from '../services/api';
+import { ShieldAlert, Users, Shield, AlertTriangle, CheckCircle2, Search, Loader2, XCircle } from 'lucide-react';
+import api, { appwriteClient } from '../services/api';
 
 const mockThreats = [
   { $id: 't1', entityId: 'upi_fraud_992', entityType: 'UPI ID', source: 'BOTH', reports: 14, score: 92, status: 'CONFIRMED', time: '2m ago' },
@@ -39,12 +39,46 @@ export default function ThreatIntel() {
     fetchThreats();
   }, []);
 
+  useEffect(() => {
+    let unsubscribe: () => void;
+    try {
+      unsubscribe = appwriteClient.subscribe(
+        'databases.argus_eye_db.collections.threats.documents',
+        (response: any) => {
+          const payload = response.payload;
+          if (response.events.includes('databases.*.collections.*.documents.*.create')) {
+            setThreats((prev: any[]) => [payload, ...prev]);
+          }
+          if (response.events.includes('databases.*.collections.*.documents.*.update')) {
+            setThreats((prev: any[]) => prev.map((t: any) =>
+              t.$id === payload.$id ? { ...t, ...payload } : t
+            ));
+          }
+        }
+      );
+    } catch (e) {
+      console.log('Appwrite realtime not available');
+    }
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
+
   const handleConfirm = async (id: string) => {
-    setThreats(prev => prev.map(t => t.$id === id ? { ...t, status: 'CONFIRMED' } : t));
+    await api.confirmThreat(id);
+    setThreats((prev: any[]) => prev.map((t: any) =>
+      t.$id === id ? { ...t, status: 'CONFIRMED' } : t
+    ));
   };
 
   const handleBlocklist = async (id: string) => {
-    setThreats(prev => prev.map(t => t.$id === id ? { ...t, status: 'BLOCKLISTED' } : t));
+    await api.blocklistThreat(id);
+    setThreats((prev: any[]) => prev.map((t: any) =>
+      t.$id === id ? { ...t, status: 'BLOCKLISTED' } : t
+    ));
+  };
+
+  const handleDismiss = async (id: string) => {
+    await api.dismissThreat(id);
+    setThreats((prev: any[]) => prev.filter((t: any) => t.$id !== id));
   };
 
   return (
@@ -113,6 +147,19 @@ export default function ThreatIntel() {
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5" style={{ color: 'var(--muted)' }}>
                       {threat.entityType}
                     </span>
+                    <span 
+                      className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
+                      style={{ 
+                        background: threat.source === 'USER' ? 'rgba(20,184,166,0.12)' : 
+                                   threat.source === 'ANALYST' ? 'rgba(244,63,94,0.12)' : 
+                                   'rgba(168,85,247,0.12)',
+                        color: threat.source === 'USER' ? '#2dd4bf' : 
+                               threat.source === 'ANALYST' ? '#fb7185' : 
+                               '#c084fc'
+                      }}
+                    >
+                      {threat.source}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
                     <span className="flex items-center gap-1">
@@ -125,11 +172,27 @@ export default function ThreatIntel() {
               </div>
 
               <div className="flex items-center gap-6">
-                <div className="text-right">
+                <div style={{ width: '80px' }}>
                   <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
-                  <div className={`text-lg font-bold ${threat.score >= 86 ? 'text-rose-400' : threat.score >= 61 ? 'text-amber-400' : threat.score >= 31 ? 'text-amber-300' : ''
-                    }`} style={threat.score < 31 ? { color: 'var(--muted)' } : {}}>
+                  <div className="text-lg font-bold" style={{
+                    color: threat.score >= 86 ? '#f43f5e' :
+                           threat.score >= 61 ? '#f97316' :
+                           threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
+                  }}>
                     {threat.score}
+                  </div>
+                  <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)', width: '80px' }}>
+                    <motion.div
+                      className="h-full rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${threat.score}%` }}
+                      transition={{ duration: 0.8, delay: 0.1 }}
+                      style={{
+                        background: threat.score >= 86 ? '#f43f5e' :
+                                    threat.score >= 61 ? '#f97316' :
+                                    threat.score >= 31 ? '#f59e0b' : '#64748b'
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -159,6 +222,13 @@ export default function ThreatIntel() {
                     title="Blocklist"
                   >
                     <ShieldAlert className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDismiss(threat.$id)}
+                    className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors"
+                    title="Dismiss"
+                  >
+                    <XCircle className="w-4 h-4" />
                   </button>
                 </div>
               </div>

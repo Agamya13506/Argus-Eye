@@ -64,6 +64,15 @@ export default function NetworkGraph() {
   const [zoom, setZoom] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [cycleHighlight, setCycleHighlight] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      setCycleHighlight(e.detail.nodes);
+    };
+    window.addEventListener('highlightCycle', handler as EventListener);
+    return () => window.removeEventListener('highlightCycle', handler as EventListener);
+  }, []);
 
   const filteredNodes = searchQuery
     ? nodes.filter(n => n.label.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -183,6 +192,7 @@ export default function NetworkGraph() {
             const to = getNodeById(edge.to);
             if (!from || !to) return null;
             const isHighlighted = hoveredNode === edge.from || hoveredNode === edge.to;
+            const isCycleEdge = cycleHighlight.includes(edge.from) && cycleHighlight.includes(edge.to);
             return (
               <g key={i}>
                 <motion.line
@@ -191,9 +201,9 @@ export default function NetworkGraph() {
                   transition={{ duration: 1, delay: 0.5 + i * 0.05 }}
                   x1={from.x} y1={from.y}
                   x2={to.x} y2={to.y}
-                  stroke={edge.suspicious ? '#f43f5e' : '#fb7185'}
-                  strokeWidth={isHighlighted ? 2.5 : 1.5}
-                  strokeDasharray={edge.suspicious ? '6 3' : 'none'}
+                  stroke={isCycleEdge ? '#7c3aed' : edge.suspicious ? '#f43f5e' : '#fb7185'}
+                  strokeWidth={isCycleEdge ? 3 : isHighlighted ? 2.5 : 1.5}
+                  strokeDasharray={edge.suspicious && !isCycleEdge ? '6 3' : 'none'}
                 />
               </g>
             );
@@ -204,6 +214,7 @@ export default function NetworkGraph() {
             const isFiltered = searchQuery && !filteredNodes.includes(node);
             const isSelected = selectedNode?.id === node.id;
             const isHovered = hoveredNode === node.id;
+            const isCycleHighlighted = cycleHighlight.includes(node.id);
             return (
               <motion.g
                 key={node.id}
@@ -215,8 +226,20 @@ export default function NetworkGraph() {
                 onMouseLeave={() => setHoveredNode(null)}
                 style={{ cursor: 'pointer' }}
               >
+                {/* Cycle highlight glow */}
+                {isCycleHighlighted && (
+                  <circle
+                    cx={node.x} cy={node.y}
+                    r={node.radius + 12}
+                    fill="none"
+                    stroke="#7c3aed"
+                    strokeWidth="2"
+                    opacity="0.6"
+                    className="animate-pulse"
+                  />
+                )}
                 {/* Glow */}
-                {(isSelected || isHovered) && (
+                {(isSelected || isHovered) && !isCycleHighlighted && (
                   <circle
                     cx={node.x} cy={node.y}
                     r={node.radius + 8}
@@ -232,14 +255,14 @@ export default function NetworkGraph() {
                     x={node.x - node.radius} y={node.y - node.radius}
                     width={node.radius * 2} height={node.radius * 2}
                     rx={4}
-                    fill={nodeColors[node.type]}
+                    fill={isCycleHighlighted ? '#7c3aed' : nodeColors[node.type]}
                     opacity={0.9}
                   />
                 ) : (
                   <circle
                     cx={node.x} cy={node.y}
                     r={node.radius}
-                    fill={nodeColors[node.type]}
+                    fill={isCycleHighlighted ? '#7c3aed' : nodeColors[node.type]}
                     opacity={0.9}
                   />
                 )}
