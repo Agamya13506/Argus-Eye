@@ -212,28 +212,10 @@ def get_recommend(case_id: str):
 
 @app.get("/forecast")
 def get_forecast():
-    # Read and return models/forecast_7day.json directly.
-    # Never rerun Prophet live.
-    import random
     forecast_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../fraudshield-ml/models/forecast_7day.json'))
     try:
         with open(forecast_path, 'r') as f:
-            forecast_data = json.load(f)
-            
-        for day in forecast_data:
-            day['yhat'] = max(0, round(day['yhat']))
-            if day['yhat'] == 0:
-                day['yhat'] = random.randint(3, 12)
-                
-            day['yhat_lower'] = max(0, round(day['yhat_lower']))
-            if day['yhat_lower'] == 0:
-                day['yhat_lower'] = max(0, day['yhat'] - random.randint(1, 3))
-                
-            day['yhat_upper'] = max(0, round(day['yhat_upper']))
-            if day['yhat_upper'] == 0:
-                day['yhat_upper'] = day['yhat'] + random.randint(2, 6)
-                
-        return forecast_data
+            return json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load forecast data: {str(e)}")
 

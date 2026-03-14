@@ -414,13 +414,14 @@ export default function AboutUs() {
                 <div className="flex items-start gap-4">
                     <Brain className="w-5 h-5 mt-0.5 flex-shrink-0 text-amber-400" />
                     <div>
-                        <div className="font-bold text-sm mb-1 text-amber-400">ML Model — Integration In Progress</div>
+                        <div className="font-bold text-sm mb-1 text-emerald-400">ML Model — Live</div>
                         <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-                            The production ML backend (XGBoost + LightGBM + CatBoost stacked ensemble, LIME, SHAP,
-                            Prophet forecaster) has been trained and serialised. It is currently being integrated into
-                            the FastAPI backend. Once connected, all risk scores shown in this dashboard will be replaced
-                            with live inference results from the trained model. The architecture, endpoints, and UI are
-                            already built to receive and display them.
+                            The production ML backend is fully integrated. A stacked ensemble of XGBoost, LightGBM,
+                            and CatBoost — trained on 284,807 real transactions — scores every transaction in real time
+                            via FastAPI on port 8000. LIME generates per-transaction explanations cached at score time.
+                            SHAP produces 8-dimension Fraud DNA radar values per case. Prophet powers the 7-day forecast
+                            with Indian festival seasonality. All risk scores, LIME bars, SHAP radars, and forecast
+                            charts in this dashboard reflect live inference from the trained model.
                         </p>
                     </div>
                 </div>

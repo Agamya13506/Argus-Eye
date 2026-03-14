@@ -34,7 +34,7 @@ robust_scaler = joblib.load(os.path.join(MODEL_DIR, 'robust_scaler.pkl'))
 FEATURES = load_json('features.json')
 SHAP_8D = load_json('shap_8d_map.json')
 THRESHOLD_DATA = load_json('threshold.json')
-THRESHOLD = 0.45  # Changed from THRESHOLD_DATA['threshold'] to fixed 0.45 per requirements
+THRESHOLD = THRESHOLD_DATA['threshold']
 
 def score_transaction(txn: dict) -> dict:
     t_start = time.time()

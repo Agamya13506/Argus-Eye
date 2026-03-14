@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity, Loader2 } from 'lucide-react';
 import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import api from '../services/api';
-import { getExplanation, getShap, getTimeline, getRecommendations } from '../services/mlApi';
+import { getExplanation, getShap, getTimeline, getRecommendations, retrainModel } from '../services/mlApi';
 
 ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -703,12 +703,64 @@ export default function Investigation() {
               <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>Case Description</h4>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{selectedCase.description}</p>
             </div>
+
+            {/* Case Event Timeline */}
+            {mlTimeline.length > 0 && (
+              <div className="glass-card p-5 rounded-xl mt-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--muted)' }}>
+                  Case Event Timeline
+                </h4>
+                <div className="space-y-3">
+                  {mlTimeline.slice(0, 6).map((event: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${event.anomaly === 'geo_impossibility' ? 'bg-rose-400' :
+                        event.anomaly === 'velocity_attack' ? 'bg-orange-400' :
+                          event.anomaly === 'new_device' ? 'bg-amber-400' :
+                            event.event === 'ANALYST_ACTION' ? 'bg-blue-400' :
+                              event.anomaly ? 'bg-rose-400' :
+                                'bg-emerald-400'
+                        }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                            {event.event?.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--muted)' }}>
+                            {new Date(event.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{event.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
           <div className="p-4 border-t flex justify-end gap-3" style={{ borderColor: 'var(--border)', background: 'var(--cardBg)' }}>
             <button onClick={handleGenerateReport} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--muted)' }}>
               Generate Report
+            </button>
+            <button
+              onClick={async () => {
+                const updated = [
+                  ...corrections,
+                  { txn_id: selectedCase.id, true_label: 0 }
+                ];
+                setCorrections(updated);
+                if (updated.length >= 50) {
+                  const result = await retrainModel(updated);
+                  if (result) {
+                    alert(`Model updated — ${result.num_corrections} corrections applied in ${result.retrain_time_ms}ms`);
+                    setCorrections([]);
+                  }
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-colors"
+            >
+              Mark Legitimate {corrections.length > 0 && `(${corrections.length}/50)`}
             </button>
             <button onClick={handleVerify} className="px-4 py-2 rounded-xl text-sm font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors">
               Verify (Safe)

@@ -209,6 +209,8 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area type="monotone" dataKey="legit" stroke="#2dd4bf" fillOpacity={1} fill="url(#colorLegit)" />
                 <Area type="monotone" dataKey="fraud" stroke="#f43f5e" fillOpacity={1} fill="url(#colorFraud)" />
+                <Area type="monotone" dataKey="forecastUpper" stroke="none" fill="#a78bfa" fillOpacity={0.08} dot={false} connectNulls={true} legendType="none" />
+                <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeDasharray="5 5" fill="none" dot={false} connectNulls={true} name="7-day forecast" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
