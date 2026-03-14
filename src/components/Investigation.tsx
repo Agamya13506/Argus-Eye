@@ -1,10 +1,10 @@
 import { motion } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity, Loader2 } from 'lucide-react';
-import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import api from '../services/api';
 
-ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const LIME_BY_TYPE: Record<string, { label: string; width: string; color: string }[]> = {
   'Account Takeover': [
@@ -146,65 +146,77 @@ export default function Investigation() {
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
+    // Destroy any existing chart on this canvas first
+    if (chartRef.current) {
+      chartRef.current.destroy();
+      chartRef.current = null;
+    }
+
     const shapData = SHAP_BY_TYPE[selectedCase.type] || SHAP_BY_TYPE['Suspicious'];
 
-    const chart = new ChartJS(ctx, {
-      type: 'radar',
-      data: {
-        labels: SHAP_LABELS,
-        datasets: [
-          {
-            label: selectedCase.type,
-            data: shapData,
-            borderColor: '#f43f5e',
-            backgroundColor: 'rgba(244,63,94,0.15)',
-            borderWidth: 2,
-            pointRadius: 3,
-          },
-          {
-            label: 'Velocity pattern',
-            data: FINGERPRINTS.velocity_attack,
-            borderColor: 'rgba(251,113,133,0.4)',
-            backgroundColor: 'transparent',
-            borderWidth: 1,
-            borderDash: [4, 4],
-            pointRadius: 0,
-          },
-          {
-            label: 'SIM Swap pattern',
-            data: FINGERPRINTS.sim_swap,
-            borderColor: 'rgba(251,191,36,0.4)',
-            backgroundColor: 'transparent',
-            borderWidth: 1,
-            borderDash: [4, 4],
-            pointRadius: 0,
-          },
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          r: {
-            min: 0,
-            max: 1,
-            ticks: { display: false },
-            grid: { color: 'rgba(148,163,184,0.15)' },
-            pointLabels: {
-              color: '#94a3b8',
-              font: { size: 10 }
-            }
-          }
+    try {
+      const chart = new ChartJS(ctx, {
+        type: 'radar',
+        data: {
+          labels: SHAP_LABELS,
+          datasets: [
+            {
+              label: selectedCase.type,
+              data: shapData,
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244,63,94,0.15)',
+              borderWidth: 2,
+              pointRadius: 3,
+            },
+            {
+              label: 'Velocity pattern',
+              data: FINGERPRINTS.velocity_attack,
+              borderColor: 'rgba(251,113,133,0.4)',
+              backgroundColor: 'transparent',
+              borderWidth: 1,
+              borderDash: [4, 4],
+              pointRadius: 0,
+            },
+            {
+              label: 'SIM Swap pattern',
+              data: FINGERPRINTS.sim_swap,
+              borderColor: 'rgba(251,191,36,0.4)',
+              backgroundColor: 'transparent',
+              borderWidth: 1,
+              borderDash: [4, 4],
+              pointRadius: 0,
+            },
+          ]
         },
-        plugins: { legend: { display: false } }
-      }
-    });
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 0,
+              max: 1,
+              ticks: { display: false },
+              grid: { color: 'rgba(148,163,184,0.15)' },
+              pointLabels: {
+                color: '#94a3b8',
+                font: { size: 10 }
+              }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
 
-    chartRef.current = chart;
+      chartRef.current = chart;
+    } catch (e) {
+      console.warn('ChartJS init error (non-fatal):', e);
+    }
 
     return () => {
-      chart.destroy();
-      chartRef.current = null;
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
     };
   }, [selectedCase.$id]);
 
