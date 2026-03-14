@@ -17,3 +17,9 @@ __pycache__/
 venv/
 env/
 .venv/
+
+# Reports
+playwright-report/
+test-results/
+# Python dev logs
+*.log
