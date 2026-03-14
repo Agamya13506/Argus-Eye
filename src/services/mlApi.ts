@@ -1,4 +1,4 @@
-const ML_BASE = 'http://localhost:8000';
+const ML_BASE = import.meta.env.VITE_ML_API_URL || 'http://localhost:8000';
 
 export async function mlFetch(path: string, options?: RequestInit) {
     try {

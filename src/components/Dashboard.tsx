@@ -72,9 +72,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     async function fetchData() {
       try {
         const [statsRes, txRes] = await Promise.all([api.getStats(), api.getTransactions()]);
-        if (statsRes?.totalTransactions) setStats(statsRes);
-        if (Array.isArray(txRes) && txRes.length > 0) setTransactions(txRes);
-      } catch (e) { }
+        if (statsRes) setStats(statsRes);
+        if (Array.isArray(txRes)) setTransactions(txRes);
+      } catch (e) { console.error('Error fetching initial data:', e) }
     }
     fetchData();
   }, []);
@@ -104,7 +104,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (subscribedRef.current) return;
     subscribedRef.current = true;
-    
+
     let unsubscribe: () => void;
     try {
       console.log('Setting up Appwrite realtime subscription...');
@@ -114,7 +114,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           console.log('Realtime event received:', response.events);
           if (response.events.some((e: string) => e.includes('create'))) {
             console.log('New transaction received:', response.payload);
-            setTransactions((prev: any[]) => [response.payload, ...prev].slice(0, 50));
+            setTransactions((prev: any[]) => [response.payload, ...prev].slice(0, 500));
             if (response.payload.status === 'blocked') {
               const amount = response.payload.amount || 0;
               setStats((prev: any) => ({
@@ -362,11 +362,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     setDemoMode(true);
     setDemoAlerts([]);
     const ids = [
-      setTimeout(() => runDemoScenario('velocity'),  5000),
-      setTimeout(() => runDemoScenario('geo'),       15000),
-      setTimeout(() => runDemoScenario('sim'),       28000),
-      setTimeout(() => runDemoScenario('circular'),  45000),
-      setTimeout(() => runDemoScenario('social'),    60000),
+      setTimeout(() => runDemoScenario('velocity'), 5000),
+      setTimeout(() => runDemoScenario('geo'), 15000),
+      setTimeout(() => runDemoScenario('sim'), 28000),
+      setTimeout(() => runDemoScenario('circular'), 45000),
+      setTimeout(() => runDemoScenario('social'), 60000),
       setTimeout(() => {
         setDemoMode(false);
         demoTimeoutIds.current = [];
@@ -463,23 +463,23 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             type,
             status
           });
-            console.log('Transaction created:', result);
+          console.log('Transaction created:', result);
 
-            // Optimistically prepend new transaction to UI immediately
-            // (don't re-fetch — the 8 seeded records will override the new one)
-            const newTx = {
-              sender: `user_${Math.floor(Math.random() * 9999)}`,
-              receiver: `merch_${Math.floor(Math.random() * 999)}`,
-              amount,
-              score,
-              type,
-              status,
-            };
-            setTransactions(prev => [newTx, ...prev].slice(0, 20));
+          // Optimistically prepend new transaction to UI immediately
+          // (don't re-fetch — the 8 seeded records will override the new one)
+          const newTx = {
+            sender: `user_${Math.floor(Math.random() * 9999)}`,
+            receiver: `merch_${Math.floor(Math.random() * 999)}`,
+            amount,
+            score,
+            type,
+            status,
+          };
+          setTransactions(prev => [newTx, ...prev].slice(0, 20));
 
-            // Also create threat if score is high
-            if (score > 60) {
-              await api.createThreat({
+          // Also create threat if score is high
+          if (score > 60) {
+            await api.createThreat({
               entityId: `user_${Math.floor(Math.random() * 9999)}`,
               entityType: 'UPI ID',
               source: 'SYSTEM',
@@ -774,138 +774,137 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </motion.div>
 
-    </motion.div>
-
-    {/* Demo Alerts rendered outside motion.div to avoid stacking context trap */}
-    {demoAlerts.length > 0 && (
-      <div className="fixed bottom-8 right-8 z-[9999] space-y-3 max-w-sm pointer-events-auto">
-        {demoAlerts.map((alert) => (
-          <motion.div
-            key={alert.id}
-            initial={{ opacity: 0, x: 100, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 100, scale: 0.9 }}
-            transition={{ type: 'spring', bounce: 0.3 }}
-            className="glass-card p-4 rounded-xl border-l-4"
-            style={{
-              borderLeftColor: alert.type === 'velocity' ? '#f97316' :
-                alert.type === 'geo' ? '#f97316' :
-                  alert.type === 'sim' ? '#f43f5e' :
-                    alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
-              background: 'rgba(15,23,42,0.95)'
-            }}
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle
-                className="w-5 h-5 flex-shrink-0 mt-0.5"
-                style={{
-                  color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' :
+      {/* Demo Alerts */}
+      {demoAlerts.length > 0 && (
+        <div className="fixed bottom-8 right-8 z-[9999] space-y-3 max-w-sm pointer-events-auto">
+          {demoAlerts.map((alert) => (
+            <motion.div
+              key={alert.id}
+              initial={{ opacity: 0, x: 100, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 100, scale: 0.9 }}
+              transition={{ type: 'spring', bounce: 0.3 }}
+              className="glass-card p-4 rounded-xl border-l-4"
+              style={{
+                borderLeftColor: alert.type === 'velocity' ? '#f97316' :
+                  alert.type === 'geo' ? '#f97316' :
                     alert.type === 'sim' ? '#f43f5e' :
-                      alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
-                }}
-              />
-              <div>
-                <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
-                <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
-                <div className="text-[10px] font-mono mb-3 p-1.5 rounded bg-black/20 text-blue-400 inline-block">
-                  {alert.rbiRef}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <button
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
-                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
-                    onClick={async () => {
-                      console.log('BLOCK clicked for alert:', alert.id);
-                      try {
-                        // Create blocked transaction
-                        await api.createTransaction({
-                          sender: `demo_${alert.type}`,
-                          receiver: 'BLOCKED',
-                          amount: 0,
-                          score: 95,
-                          type: alert.title,
-                          status: 'blocked',
-                        });
-                        // Also create/update a threat
-                        await api.createThreat({
-                          entityId: `demo_${alert.type}`,
-                          entityType: 'UPI ID',
-                          source: 'ANALYST',
-                          reports: 1,
-                          score: 95,
-                          status: 'CONFIRMED',
-                          time: 'Just now'
-                        });
-                        console.log('Block completed successfully');
-                      } catch (e) { 
-                        console.error('Block error:', e); 
-                        alert('Failed to block: ' + e);
-                      }
-                      setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
-                    }}
-                  >
-                    Block
-                  </button>
-                  <button
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
-                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
-                    onClick={async () => {
-                      console.log('VERIFY clicked for alert:', alert.id);
-                      try {
-                        await api.createTransaction({
-                          sender: `demo_${alert.type}`,
-                          receiver: 'VERIFIED',
-                          amount: 0,
-                          score: 15,
-                          type: alert.title,
-                          status: 'clear',
-                        });
-                        console.log('Verify completed successfully');
-                      } catch (e) { 
-                        console.error('Verify error:', e);
-                        alert('Failed to verify: ' + e);
-                      }
-                      setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
-                    }}
-                  >
-                    Verify
-                  </button>
-                  <button
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
-                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
-                    onClick={() => {
-                      if (alert.type === 'circular') {
-                        onNavigate?.('/network');
-                        setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('highlightCycle', {
-                            detail: { nodes: ['user_44', 'user_8', 'user_89'] }
-                          }));
-                        }, 600);
-                      } else {
-                        const typeMap: Record<string, string> = {
-                          velocity: 'Card Testing',
-                          geo: 'Account Takeover',
-                          sim: 'SIM Swap',
-                          social: 'Phishing',
-                        };
-                        // Navigate first, then dispatch after Investigation has mounted
-                        onNavigate?.('/investigation');
-                        setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('investigationSelect', {
-                            detail: { caseType: typeMap[alert.type] || 'Suspicious' }
-                          }));
-                        }, 400);
-                      }
-                    }}
-                  >
-                    Investigate →
-                  </button>
+                      alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
+                background: 'rgba(15,23,42,0.95)'
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  className="w-5 h-5 flex-shrink-0 mt-0.5"
+                  style={{
+                    color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' :
+                      alert.type === 'sim' ? '#f43f5e' :
+                        alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
+                  }}
+                />
+                <div>
+                  <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
+                  <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
+                  <div className="text-[10px] font-mono mb-3 p-1.5 rounded bg-black/20 text-blue-400 inline-block">
+                    {alert.rbiRef}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
+                      style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                      onClick={async () => {
+                        console.log('BLOCK clicked for alert:', alert.id);
+                        try {
+                          // Create blocked transaction
+                          await api.createTransaction({
+                            sender: `demo_${alert.type}`,
+                            receiver: 'BLOCKED',
+                            amount: 0,
+                            score: 95,
+                            type: alert.title,
+                            status: 'blocked',
+                          });
+                          // Also create/update a threat
+                          await api.createThreat({
+                            entityId: `demo_${alert.type}`,
+                            entityType: 'UPI ID',
+                            source: 'ANALYST',
+                            reports: 1,
+                            score: 95,
+                            status: 'CONFIRMED',
+                            time: 'Just now'
+                          });
+                          console.log('Block completed successfully');
+                        } catch (e) {
+                          console.error('Block error:', e);
+                          alert('Failed to block: ' + e);
+                        }
+                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                      }}
+                    >
+                      Block
+                    </button>
+                    <button
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                      style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                      onClick={async () => {
+                        console.log('VERIFY clicked for alert:', alert.id);
+                        try {
+                          await api.createTransaction({
+                            sender: `demo_${alert.type}`,
+                            receiver: 'VERIFIED',
+                            amount: 0,
+                            score: 15,
+                            type: alert.title,
+                            status: 'clear',
+                          });
+                          console.log('Verify completed successfully');
+                        } catch (e) {
+                          console.error('Verify error:', e);
+                          alert('Failed to verify: ' + e);
+                        }
+                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                      }}
+                    >
+                      Verify
+                    </button>
+                    <button
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                      style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                      onClick={() => {
+                        if (alert.type === 'circular') {
+                          onNavigate?.('/network');
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('highlightCycle', {
+                              detail: { nodes: ['user_44', 'user_8', 'user_89'] }
+                            }));
+                          }, 600);
+                        } else {
+                          const typeMap: Record<string, string> = {
+                            velocity: 'Card Testing',
+                            geo: 'Account Takeover',
+                            sim: 'SIM Swap',
+                            social: 'Phishing',
+                          };
+                          // Navigate first, then dispatch after Investigation has mounted
+                          onNavigate?.('/investigation');
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('investigationSelect', {
+                              detail: { caseType: typeMap[alert.type] || 'Suspicious' }
+                            }));
+                          }, 400);
+                        }
+                      }}
+                    >
+                      Investigate →
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </motion.div>
   );
 }

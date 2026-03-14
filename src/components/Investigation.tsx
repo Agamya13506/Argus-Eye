@@ -4,46 +4,46 @@ import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity
 import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell } from 'recharts';
 import api from '../services/api';
-import { getExplanation, getShap, getTimeline, getRecommendations, retrainModel } from '../services/mlApi';
+import { getExplanation, getShap, getTimeline, getRecommendations, retrainModel, mlFetch } from '../services/mlApi';
 
 ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const LIME_BY_TYPE: Record<string, { label: string; value: number; width: string; color: string }[]> = {
   'Account Takeover': [
-    { label: 'Location',  value: 92, width: '92%', color: '#f43f5e' },
-    { label: 'Velocity',  value: 85, width: '85%', color: '#f43f5e' },
-    { label: 'Amount',    value: 78, width: '78%', color: '#f59e0b' },
-    { label: 'Device',    value: 65, width: '65%', color: '#f59e0b' },
+    { label: 'Location', value: 92, width: '92%', color: '#f43f5e' },
+    { label: 'Velocity', value: 85, width: '85%', color: '#f43f5e' },
+    { label: 'Amount', value: 78, width: '78%', color: '#f59e0b' },
+    { label: 'Device', value: 65, width: '65%', color: '#f59e0b' },
   ],
   'SIM Swap': [
     { label: 'New Device', value: 96, width: '96%', color: '#f43f5e' },
     { label: 'Hour (3am)', value: 88, width: '88%', color: '#f43f5e' },
-    { label: 'Amount',     value: 71, width: '71%', color: '#f59e0b' },
-    { label: 'Velocity',   value: 44, width: '44%', color: '#f59e0b' },
+    { label: 'Amount', value: 71, width: '71%', color: '#f59e0b' },
+    { label: 'Velocity', value: 44, width: '44%', color: '#f59e0b' },
   ],
   'Card Testing': [
     { label: 'Velocity', value: 98, width: '98%', color: '#f43f5e' },
-    { label: 'Amount',   value: 45, width: '45%', color: '#f59e0b' },
+    { label: 'Amount', value: 45, width: '45%', color: '#f59e0b' },
     { label: 'Merchant', value: 38, width: '38%', color: '#f59e0b' },
-    { label: 'Device',   value: 22, width: '22%', color: '#94a3b8' },
+    { label: 'Device', value: 22, width: '22%', color: '#94a3b8' },
   ],
   'Money Mule': [
     { label: 'Recipient', value: 89, width: '89%', color: '#f43f5e' },
-    { label: 'Network',   value: 82, width: '82%', color: '#f43f5e' },
-    { label: 'Amount',    value: 67, width: '67%', color: '#f59e0b' },
-    { label: 'Velocity',  value: 51, width: '51%', color: '#f59e0b' },
+    { label: 'Network', value: 82, width: '82%', color: '#f43f5e' },
+    { label: 'Amount', value: 67, width: '67%', color: '#f59e0b' },
+    { label: 'Velocity', value: 51, width: '51%', color: '#f59e0b' },
   ],
   'Suspicious': [
     { label: 'Velocity', value: 72, width: '72%', color: '#f43f5e' },
-    { label: 'Device',   value: 61, width: '61%', color: '#f59e0b' },
-    { label: 'Amount',   value: 48, width: '48%', color: '#f59e0b' },
-    { label: 'Hour',     value: 35, width: '35%', color: '#94a3b8' },
+    { label: 'Device', value: 61, width: '61%', color: '#f59e0b' },
+    { label: 'Amount', value: 48, width: '48%', color: '#f59e0b' },
+    { label: 'Hour', value: 35, width: '35%', color: '#94a3b8' },
   ],
   'Phishing': [
     { label: 'Recipient', value: 89, width: '89%', color: '#f43f5e' },
-    { label: 'Network',   value: 75, width: '75%', color: '#f43f5e' },
-    { label: 'Amount',    value: 62, width: '62%', color: '#f59e0b' },
-    { label: 'Time',      value: 48, width: '48%', color: '#f59e0b' },
+    { label: 'Network', value: 75, width: '75%', color: '#f43f5e' },
+    { label: 'Amount', value: 62, width: '62%', color: '#f59e0b' },
+    { label: 'Time', value: 48, width: '48%', color: '#f59e0b' },
   ],
 };
 
@@ -267,19 +267,31 @@ export default function Investigation() {
     (async () => {
       setMlLimeBars(null);
       setLimeLoading(true);
+
+      const casePayloadMap: Record<string, any> = {
+        'Account Takeover': { amount_inr: 120000, amount_scaled: 6.0, hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1, V14: -24, V4: 7, V12: -18, V10: -15, V11: -8 },
+        'SIM Swap': { amount_inr: 45000, amount_scaled: 2.2, hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1, V14: -20, V4: 6, V12: -13, V10: -10, V11: -5 },
+        'Card Testing': { amount_inr: 2500, amount_scaled: 0.1, hour: 14, velocity_60s: 22, is_new_device: 0, is_new_recipient: 1, V14: -20, V4: 6, V12: -13, V10: -10, V11: -5 },
+        'Money Mule': { amount_inr: 95000, amount_scaled: 4.5, hour: 22, velocity_60s: 8, is_new_device: 0, is_new_recipient: 1, V14: -19, V4: 5.5, V12: -12, V10: -9, V11: -5 },
+        'Phishing': { amount_inr: 50000, amount_scaled: 2.5, hour: 23, velocity_60s: 2, is_new_device: 0, is_new_recipient: 1, V14: -18, V4: 5.0, V12: -11, V10: -8, V11: -4 }
+      };
+
+      const payload = casePayloadMap[selectedCase.type] || casePayloadMap['Phishing'];
+
       // Score WITH explanation enabled (skip_explain: false) and wait for it
       try {
-        await fetch('http://localhost:8000/score', {
+        await mlFetch('/score', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...casePayload, txn_id: selectedCase.id, skip_explain: false }),
+          body: JSON.stringify({ ...payload, txn_id: selectedCase.id, skip_explain: false }),
         });
-      } catch (_) {}
-      // Wait for LIME to complete — LIME takes 800-1500ms
-      await new Promise(r => setTimeout(r, 1800));
+      } catch (_) { }
 
-      getExplanation(selectedCase.id).then(lime => {
-        if (lime && lime.length > 0) {
+      // Wait for LIME to complete — LIME takes 800-1500ms
+      await new Promise(r => setTimeout(r, 2000));
+
+      try {
+        const lime = await getExplanation(selectedCase.id);
+        if (lime && Array.isArray(lime) && lime.length > 0) {
           const maxWeight = Math.max(...lime.map((r: any) => Math.abs(r.weight)), 0.0001);
           const bars = lime
             .slice(0, 5)
@@ -292,9 +304,12 @@ export default function Investigation() {
           if (bars.length > 0) {
             setMlLimeBars(bars);
           }
-          setLimeLoading(false);
         }
-      }).catch(() => setLimeLoading(false));
+      } catch (e) {
+        console.error('LIME display error:', e);
+      } finally {
+        setLimeLoading(false);
+      }
 
       getRecommendations(selectedCase.id).then(recs => {
         if (recs && recs.length > 0) setMlRecommendations(recs);
@@ -315,24 +330,25 @@ export default function Investigation() {
       try {
         const data = await api.getCases();
         if (!mounted) return;
-        if (data?.length > 0) {
+
+        if (Array.isArray(data) && data.length > 0) {
           const mapped = data.map((c: any, i: number) => ({
             $id: c.$id,
-            id: `CASE-${8842 - i}`,
+            id: c.caseId || `CASE-${8842 - i}`,
             priority: c.priority === 'critical' ? 95 : c.priority === 'high' ? 80 : 55,
             amount: `₹${(c.amount || 0).toLocaleString()}`,
             type: c.title || c.type || 'Unknown',
-            time: 'Recent',
+            time: c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
             status: c.priority === 'critical' ? 'URGENT' : c.priority === 'high' ? 'HIGH' : 'ROUTINE',
             description: c.description || 'No description',
           }));
-          // Sort by priority descending so new critical cases rise to the top
+          // Priority sort
           mapped.sort((a: any, b: any) => b.priority - a.priority);
           setCases(mapped);
-          if (isInitial) setSelectedCase(mapped[0]);
+          if (isInitial && mapped.length > 0) setSelectedCase(mapped[0]);
         }
       } catch (e) {
-        // use mock
+        console.error('Fetch cases error:', e);
       } finally {
         if (isInitial && mounted) setLoading(false);
       }

@@ -77,7 +77,11 @@ def score_transaction(txn: dict, skip_explain: bool = False) -> dict:
     # 4. Fraud type (only if is_fraud=True)
     fraud_type = None
     if is_fraud:
-        fraud_type = str(convert_to_native(model_rf_type.predict(row)[0]))
+        try:
+            fraud_type = str(convert_to_native(model_rf_type.predict(row)[0]))
+        except Exception as e:
+            print("Warning: model_rf_type predict failed:", e)
+            fraud_type = "Unknown"
 
     # 5. LIME & SHAP - only if not skipped
     if skip_explain:
@@ -118,41 +122,24 @@ def score_transaction(txn: dict, skip_explain: bool = False) -> dict:
 
     inference_ms = round((time.time() - t_start) * 1000, 1)
 
-    # 7. Return
-    return {
-        "score": round(score * 100, 1),  # 0-100
-        "raw_proba": round(score, 4),
-        "is_fraud": is_fraud,
-        "risk_level": risk_level,
-        "fraud_type": fraud_type,
-        "model_breakdown": {
-            "xgb": round(p_xgb, 4),
-            "lgb": round(p_lgb, 4),
-            "cat": round(p_cat, 4),
-        },
-        "lime": lime_reasons,
-        "shap_8d": shap_8d,
-        "inference_ms": inference_ms,
-    }
-
-    inference_ms = round((time.time() - t_start) * 1000, 1)
-
-    # 7. Return
-    return {
-        "score": round(score * 100, 1),  # 0-100
-        "raw_proba": round(score, 4),
-        "is_fraud": is_fraud,
-        "risk_level": risk_level,
-        "fraud_type": fraud_type,
-        "model_breakdown": {
-            "xgb": round(p_xgb, 4),
-            "lgb": round(p_lgb, 4),
-            "cat": round(p_cat, 4),
-        },
-        "lime": lime_reasons,
-        "shap_8d": shap_8d,
-        "inference_ms": inference_ms,
-    }
+    # 7. Return (ensure all values are native Python types for JSON serialization)
+    return convert_to_native(
+        {
+            "score": round(float(score) * 100, 1),  # 0-100
+            "raw_proba": round(float(score), 4),
+            "is_fraud": bool(is_fraud),
+            "risk_level": str(risk_level),
+            "fraud_type": str(fraud_type) if fraud_type else None,
+            "model_breakdown": {
+                "xgb": round(float(p_xgb), 4),
+                "lgb": round(float(p_lgb), 4),
+                "cat": round(float(p_cat), 4),
+            },
+            "lime": lime_reasons,
+            "shap_8d": shap_8d,
+            "inference_ms": float(inference_ms),
+        }
+    )
 
 
 if __name__ == "__main__":

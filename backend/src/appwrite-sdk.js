@@ -62,7 +62,7 @@ class AppwriteService {
         Permission.read(Role.any()),
         Permission.write(Role.any())
       ];
-      
+
       return await this.databases.createDocument(
         this.databaseId,
         collectionId,
@@ -87,6 +87,20 @@ class AppwriteService {
     } catch (err) {
       console.error(`Failed to get documents from ${collectionId}:`, err.message);
       return [];
+    }
+  }
+
+  async getDocumentsWithTotal(collectionId, queries = []) {
+    try {
+      const result = await this.databases.listDocuments(
+        this.databaseId,
+        collectionId,
+        queries
+      );
+      return result;
+    } catch (err) {
+      console.error(`Failed to get documents (with total) from ${collectionId}:`, err.message);
+      return { total: 0, documents: [] };
     }
   }
 
@@ -116,4 +130,4 @@ class AppwriteService {
 }
 
 export const appwrite = new AppwriteService();
-export { ID, Permission, Role } from 'node-appwrite';
+export { ID, Permission, Role, Query } from 'node-appwrite';

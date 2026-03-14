@@ -100,22 +100,36 @@ async def score_txn(request: Request):
     # The prompt explicitly asks: "Store in memory, apply to next /score call."
     # We log rule application here as requested
     applied_rules = {"velocity": _velocity_rules}
-    # 2. Score via ML ensemble logic
-    result = score_transaction(txn, skip_explain=skip_explain)
-
-    global _last_inference_ms
-    _last_inference_ms = result.get("inference_ms", 45.0)
-
-    # Optional enhancement: attach rules trace
-    result["rules_applied"] = applied_rules
-
-    # 3. Cache the full result including LIME/SHAP
-    feature_row = {f: txn.get(f, 0) for f in FEATURES}
-    _score_cache[txn_id] = result
-    _score_cache[txn_id]["_feature_row"] = feature_row
-
-    # Convert numpy types for JSON serialization
-    return convert_numpy({k: v for k, v in result.items() if k != "_feature_row"})
+    
+    try:
+        # 2. Score via ML ensemble logic
+        result = score_transaction(txn, skip_explain=skip_explain)
+        
+        global _last_inference_ms
+        _last_inference_ms = result.get("inference_ms", 45.0)
+        
+        # Optional enhancement: attach rules trace
+        result["rules_applied"] = applied_rules
+        
+        # 3. Cache the full result including LIME/SHAP
+        feature_row = {f: txn.get(f, 0) for f in FEATURES}
+        _score_cache[txn_id] = result
+        _score_cache[txn_id]["_feature_row"] = feature_row
+        
+        # Convert numpy types for JSON serialization
+        return convert_numpy({k: v for k, v in result.items() if k != "_feature_row"})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # Safe fallback
+        return {
+            "score": 50,
+            "raw_proba": 0.5,
+            "is_fraud": False,
+            "risk_level": "UNKNOWN",
+            "fraud_type": None,
+            "error_msg": str(e)
+        }
 
 
 @app.get("/explain/{txn_id}")
