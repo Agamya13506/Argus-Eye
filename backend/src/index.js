@@ -114,6 +114,7 @@ async function initializeAppwrite() {
       { key: 'description', type: 'string', size: 1024, required: false },
       { key: 'priority',    type: 'string', size: 32,  required: false },
       { key: 'status',      type: 'string', size: 32,  required: false },
+      { key: 'amount',      type: 'integer', required: false, default: 0 },
       { key: 'assignedTo',  type: 'string', size: 128, required: false },
       { key: 'createdAt',   type: 'string', size: 64,  required: false },
     ];
@@ -160,9 +161,9 @@ async function seedData() {
   console.log('Threats seeded');
 
   const caseData = [
-    { title: 'SIM Swap Investigation', description: 'Multiple reports of SIM swap fraud', priority: 'high', status: 'in_progress', assignedTo: 'Analyst 42' },
-    { title: 'Phishing Campaign Detection', description: 'Identified organized phishing campaign', priority: 'critical', status: 'open', assignedTo: 'Unassigned' },
-    { title: 'Merchant Fraud Review', description: 'Review of suspicious merchant transactions', priority: 'medium', status: 'in_progress', assignedTo: 'Analyst 15' },
+    { title: 'SIM Swap Investigation', description: 'Multiple reports of SIM swap fraud', priority: 'high', status: 'in_progress', amount: 45000, assignedTo: 'Analyst 42' },
+    { title: 'Phishing Campaign Detection', description: 'Identified organized phishing campaign', priority: 'critical', status: 'open', amount: 120000, assignedTo: 'Unassigned' },
+    { title: 'Merchant Fraud Review', description: 'Review of suspicious merchant transactions', priority: 'medium', status: 'in_progress', amount: 8500, assignedTo: 'Analyst 15' },
   ];
   for (const c of caseData) { await appwriteFetch(`/databases/${DATABASE_ID}/collections/cases/documents`, 'POST', { documentId: ID.unique(), data: { ...c, createdAt: new Date().toISOString() } }); }
   console.log('Cases seeded');

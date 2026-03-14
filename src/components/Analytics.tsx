@@ -41,18 +41,40 @@ export default function Analytics() {
     fetchData();
   }, []);
 
+  const EXTENDED_MOCK: Record<string, typeof mockTimeline> = {
+    '7d': [
+      { name: 'Mon', fraud: 4000, legit: 24000 },
+      { name: 'Tue', fraud: 3000, legit: 13980 },
+      { name: 'Wed', fraud: 2000, legit: 9800 },
+      { name: 'Thu', fraud: 2780, legit: 39080 },
+      { name: 'Fri', fraud: 1890, legit: 48000 },
+      { name: 'Sat', fraud: 2390, legit: 38000 },
+      { name: 'Sun', fraud: 3490, legit: 43000 },
+    ],
+    '30d': [
+      { name: 'W1', fraud: 14200, legit: 95000 },
+      { name: 'W2', fraud: 11800, legit: 88000 },
+      { name: 'W3', fraud: 16500, legit: 102000 },
+      { name: 'W4', fraud: 13900, legit: 97000 },
+    ],
+    '90d': [
+      { name: 'Jan W1', fraud: 12000, legit: 85000 },
+      { name: 'Jan W2', fraud: 14500, legit: 91000 },
+      { name: 'Jan W3', fraud: 11200, legit: 78000 },
+      { name: 'Jan W4', fraud: 15800, legit: 94000 },
+      { name: 'Feb W1', fraud: 13400, legit: 88000 },
+      { name: 'Feb W2', fraud: 16200, legit: 97000 },
+      { name: 'Feb W3', fraud: 12700, legit: 82000 },
+      { name: 'Feb W4', fraud: 18900, legit: 105000 },
+      { name: 'Mar W1', fraud: 14100, legit: 90000 },
+      { name: 'Mar W2', fraud: 15600, legit: 96000 },
+      { name: 'Mar W3', fraud: 13300, legit: 87000 },
+      { name: 'Mar W4', fraud: 17400, legit: 101000 },
+    ],
+  };
+
   useEffect(() => {
-    const filterByRange = (data: typeof mockTimeline, range: string) => {
-      if (range === '7d')  return data.slice(-7);
-      if (range === '30d') return data;
-      if (range === '90d') return Array.from({length: 13}, (_, i) => ({
-        name: `W${i+1}`,
-        fraud: Math.floor(Math.random() * 5000) + 1000,
-        legit: Math.floor(Math.random() * 50000) + 10000,
-      }));
-      return data;
-    };
-    setTimelineData(filterByRange(mockTimeline, dateRange));
+    setTimelineData(EXTENDED_MOCK[dateRange] || EXTENDED_MOCK['7d']);
   }, [dateRange]);
 
   const exportCSV = (data: typeof timelineData) => {

@@ -65,14 +65,10 @@ function AppContent() {
                   <LoginPage key="login" onLogin={handleLogin} />
                 )}
                 {user && activeTab === 'dashboard' && (
-                  <div key="dashboard" className="p-8 min-h-screen">
-                    <Dashboard onNavigate={setActiveTab} />
-                  </div>
+                  <Dashboard key="dashboard" onNavigate={setActiveTab} />
                 )}
                 {user && activeTab === 'threat-intel' && (
-                  <div key="threat-intel" className="p-8 min-h-screen">
-                    <ThreatIntel />
-                  </div>
+                  <ThreatIntel key="threat-intel" />
                 )}
                 {user && activeTab === 'investigation' && <Investigation key="investigation" />}
                 {user && activeTab === 'network' && <NetworkGraph key="network" />}

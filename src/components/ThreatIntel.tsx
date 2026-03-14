@@ -13,6 +13,7 @@ const mockThreats = [
 export default function ThreatIntel() {
   const [threats, setThreats] = useState(mockThreats);
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchThreats() {
@@ -64,22 +65,51 @@ export default function ThreatIntel() {
   }, []);
 
   const handleConfirm = async (id: string) => {
-    await api.confirmThreat(id);
+    setProcessingId(id);
+    const prev = threats.find((t: any) => t.$id === id);
     setThreats((prev: any[]) => prev.map((t: any) =>
       t.$id === id ? { ...t, status: 'CONFIRMED' } : t
     ));
+    try {
+      await api.confirmThreat(id);
+    } catch (e) {
+      setThreats((prev: any[]) => prev.map((t: any) =>
+        t.$id === id ? { ...t, ...prev } : t
+      ));
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleBlocklist = async (id: string) => {
-    await api.blocklistThreat(id);
+    setProcessingId(id);
+    const prev = threats.find((t: any) => t.$id === id);
     setThreats((prev: any[]) => prev.map((t: any) =>
       t.$id === id ? { ...t, status: 'BLOCKLISTED' } : t
     ));
+    try {
+      await api.blocklistThreat(id);
+    } catch (e) {
+      setThreats((prev: any[]) => prev.map((t: any) =>
+        t.$id === id ? { ...t, ...prev } : t
+      ));
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleDismiss = async (id: string) => {
-    await api.dismissThreat(id);
+    setProcessingId(id);
+    const prev = threats.find((t: any) => t.$id === id);
+    const prevThreats = [...threats];
     setThreats((prev: any[]) => prev.filter((t: any) => t.$id !== id));
+    try {
+      await api.dismissThreat(id);
+    } catch (e) {
+      setThreats(prevThreats);
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   return (
@@ -211,25 +241,28 @@ export default function ThreatIntel() {
                   {threat.status !== 'CONFIRMED' && threat.status !== 'BLOCKLISTED' && (
                     <button
                       onClick={() => handleConfirm(threat.$id)}
-                      className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors"
+                      disabled={processingId === threat.$id}
+                      className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50"
                       title="Confirm Threat"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
+                      {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                     </button>
                   )}
                   <button
                     onClick={() => handleBlocklist(threat.$id)}
-                    className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"
+                    disabled={processingId === threat.$id}
+                    className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50"
                     title="Blocklist"
                   >
-                    <ShieldAlert className="w-4 h-4" />
+                    {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => handleDismiss(threat.$id)}
-                    className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors"
+                    disabled={processingId === threat.$id}
+                    className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
                     title="Dismiss"
                   >
-                    <XCircle className="w-4 h-4" />
+                    {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

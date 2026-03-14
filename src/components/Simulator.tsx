@@ -10,6 +10,7 @@ const attackVectors = [
   { id: 'geo_imposter', name: 'Geo Impersonation', description: 'Transactions from impossible travel distances', risk: 'Medium' },
   { id: 'mule', name: 'Money Mule', description: 'Layering transfers through intermediary accounts', risk: 'High' },
   { id: 'phishing', name: 'Phishing Attack', description: 'Credential harvesting and fraudulent transactions', risk: 'Critical' },
+  { id: 'uco_bank', name: 'UCO Bank Pattern', description: 'ISO-8583 Process-and-Check logic inversion — credit before validation', risk: 'Critical' },
 ];
 
 interface SimResult {
@@ -35,6 +36,7 @@ export default function Simulator() {
       geo_imposter:     89,
       mule:             82,
       phishing:         86,
+      uco_bank:         96,
     };
     const base = baseScores[vectorId] || 85;
     const variance = (iteration % 3 === 0 ? -8 :
@@ -71,6 +73,7 @@ export default function Simulator() {
       geo_imposter:     { detection: 0.93, block: 0.96 },
       mule:             { detection: 0.88, block: 0.92 },
       phishing:         { detection: 0.89, block: 0.93 },
+      uco_bank:         { detection: 0.97, block: 0.99 },
     };
     const stats = vectorStats[selectedVector] || { detection: 0.90, block: 0.94 };
     const total = 800 + Math.floor(selectedVector.length * 47);
@@ -171,6 +174,27 @@ export default function Simulator() {
               </button>
             ))}
           </div>
+
+          {selectedVector === 'uco_bank' && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-card p-4 rounded-xl border border-amber-500/20 mb-4"
+              style={{ background: 'rgba(245,158,11,0.05)' }}
+            >
+              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
+                UCO Bank IMPS Glitch — 2023
+              </div>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                The 2023 UCO Bank IMPS glitch resulted in ₹820 crore being credited to 41,000 
+                accounts through ISO-8583 message mis-routing. The middleware used 
+                "Process-and-Check" logic — credits were applied before message field validation. 
+                When validation failed, the sender's bank received a refund but the receiver kept 
+                the money. This preset simulates that exact pattern. FraudShield detects it via 
+                Circular Fund Flow analysis and velocity rules.
+              </p>
+            </motion.div>
+          )}
 
           {/* Simulation Logs */}
           <div className="flex-1 overflow-y-auto pr-2 space-y-2">

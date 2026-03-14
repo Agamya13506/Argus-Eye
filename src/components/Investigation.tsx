@@ -141,17 +141,12 @@ export default function Investigation() {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
-
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
     const shapData = SHAP_BY_TYPE[selectedCase.type] || SHAP_BY_TYPE['Suspicious'];
 
-    chartRef.current = new ChartJS(ctx, {
+    const chart = new ChartJS(ctx, {
       type: 'radar',
       data: {
         labels: SHAP_LABELS,
@@ -203,10 +198,11 @@ export default function Investigation() {
       }
     });
 
+    chartRef.current = chart;
+
     return () => {
-      if (chartRef.current) {
-        chartRef.current.destroy();
-      }
+      chart.destroy();
+      chartRef.current = null;
     };
   }, [selectedCase.$id]);
 
@@ -237,14 +233,67 @@ export default function Investigation() {
     fetchCases();
   }, []);
 
-  const handleBlock = () => {
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const match = cases.find(c => c.type === e.detail.caseType);
+      if (match) setSelectedCase(match);
+    };
+    window.addEventListener('investigationSelect', handler as EventListener);
+    return () => window.removeEventListener('investigationSelect', handler as EventListener);
+  }, [cases]);
+
+  const handleBlock = async () => {
     setCases(prev => prev.map(c => c.$id === selectedCase.$id ? { ...c, status: 'BLOCKED' } : c));
     setSelectedCase(prev => ({ ...prev, status: 'BLOCKED' }));
+    try {
+      await api.updateCase(selectedCase.$id, { status: 'BLOCKED' });
+    } catch (e) { /* silent — state already updated */ }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     setCases(prev => prev.map(c => c.$id === selectedCase.$id ? { ...c, status: 'VERIFIED' } : c));
     setSelectedCase(prev => ({ ...prev, status: 'VERIFIED' }));
+    try {
+      await api.updateCase(selectedCase.$id, { status: 'VERIFIED' });
+    } catch (e) { /* silent */ }
+  };
+
+  const handleGenerateReport = () => {
+    const caseDetail = CASE_DETAILS[selectedCase.type] || CASE_DETAILS['Suspicious'];
+    const recoveryProb = getRecoveryProb(selectedCase);
+    const content = [
+      `FRAUDSHIELD INCIDENT REPORT`,
+      `Generated: ${new Date().toLocaleString()}`,
+      ``,
+      `Case ID: ${selectedCase.id}`,
+      `Type: ${selectedCase.type}`,
+      `Amount: ${selectedCase.amount}`,
+      `Status: ${selectedCase.status}`,
+      `Priority: ${selectedCase.priority}`,
+      `Flagged: ${selectedCase.time}`,
+      ``,
+      `TRANSACTION DETAILS`,
+      `Sender: ${caseDetail.sender}`,
+      `Receiver: ${caseDetail.receiver}`,
+      `Location: ${caseDetail.location}`,
+      `RBI Reference: ${caseDetail.rbi}`,
+      ``,
+      `DESCRIPTION`,
+      `${selectedCase.description}`,
+      ``,
+      `RECOVERY PROBABILITY`,
+      `${recoveryProb}% chance of recovery`,
+      ``,
+      `LIME TOP RISK FACTORS`,
+      ...(LIME_BY_TYPE[selectedCase.type] || []).map(b => `  ${b.label}: ${b.width}`),
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedCase.id}-report.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -439,7 +488,7 @@ export default function Investigation() {
                 <div className="glass-card p-5 rounded-xl">
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>SHAP Fraud DNA</h4>
                   <div className="h-[200px]">
-                    <canvas ref={canvasRef} />
+                    <canvas key={selectedCase.$id} ref={canvasRef} />
                   </div>
                 </div>
               </div>
@@ -529,7 +578,7 @@ export default function Investigation() {
 
           {/* Footer */}
           <div className="p-4 border-t flex justify-end gap-3" style={{ borderColor: 'var(--border)', background: 'var(--cardBg)' }}>
-            <button className="px-4 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--muted)' }}>
+            <button onClick={handleGenerateReport} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-white/5" style={{ color: 'var(--muted)' }}>
               Generate Report
             </button>
             <button onClick={handleVerify} className="px-4 py-2 rounded-xl text-sm font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors">

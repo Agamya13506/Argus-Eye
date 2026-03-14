@@ -42,6 +42,7 @@ interface Alert {
 
 interface DashboardProps {
   onNavigate?: (tab: string) => void;
+  [key: string]: any;
 }
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const [stats, setStats] = useState(mockStats);
@@ -179,9 +180,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           description: 'user_44 → user_8 → user_89 → user_44. Total: ₹1,77,000. Money laundering pattern detected.',
           timestamp: Date.now()
         };
-        window.dispatchEvent(new CustomEvent('highlightCycle', {
-          detail: { nodes: ['user_44', 'user_8', 'user_89'] }
-        }));
+        onNavigate?.('network');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('highlightCycle', {
+            detail: { nodes: ['user_44', 'user_8', 'user_89'] }
+          }));
+        }, 600);
         break;
       case 'social':
         newAlert = {
@@ -493,11 +497,22 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     style={{ color: 'var(--accent)' }}
                     onClick={() => {
                       if (alert.type === 'circular') {
-                        window.dispatchEvent(new CustomEvent('highlightCycle', {
-                          detail: { nodes: ['user_44', 'user_8', 'user_89'] }
-                        }));
                         onNavigate?.('network');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('highlightCycle', {
+                            detail: { nodes: ['user_44', 'user_8', 'user_89'] }
+                          }));
+                        }, 600);
                       } else {
+                        const typeMap: Record<string, string> = {
+                          velocity: 'Card Testing',
+                          geo: 'Account Takeover',
+                          sim: 'SIM Swap',
+                          social: 'Phishing',
+                        };
+                        window.dispatchEvent(new CustomEvent('investigationSelect', {
+                          detail: { caseType: typeMap[alert.type] || 'Suspicious' }
+                        }));
                         onNavigate?.('investigation');
                       }
                     }}

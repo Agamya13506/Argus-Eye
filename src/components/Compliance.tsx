@@ -94,6 +94,32 @@ export default function Compliance() {
     return r.type.includes(filterType);
   });
 
+  const exportFrameworkReport = () => {
+    const header = 'Framework,Score,Status,Last Audit,Next Audit\n';
+    const rows = complianceFrameworks.map(f => 
+      `${f.name},${f.score},${f.status},${f.lastAudit},${f.nextAudit}`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `compliance-frameworks-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportReportCSV = (report: typeof reports[0]) => {
+    const header = 'Report ID,Type,Date,Status,Agency\n';
+    const rows = `${report.id},${report.type},${report.date},${report.status},${report.agency}`;
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report.id}-report.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -109,7 +135,7 @@ export default function Compliance() {
           </h2>
           <p style={{ color: 'var(--muted)' }}>Regulatory compliance & audit trail management</p>
         </div>
-        <button className="btn-accent flex items-center gap-2">
+        <button onClick={exportFrameworkReport} className="btn-accent flex items-center gap-2">
           <FileDown className="w-4 h-4" /> Generate Report
         </button>
       </header>
@@ -314,7 +340,7 @@ export default function Compliance() {
                     </span>
                   </td>
                   <td className="py-4 text-right">
-                    <button className="p-2 hover:bg-rose-500/10 text-rose-400 rounded-lg transition-colors" title="Download PDF">
+                    <button onClick={() => exportReportCSV(report)} className="p-2 hover:bg-rose-500/10 text-rose-400 rounded-lg transition-colors" title="Download PDF">
                       <Download className="w-4 h-4" />
                     </button>
                   </td>
