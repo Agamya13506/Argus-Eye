@@ -1,17 +1,19 @@
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Play, Settings, ShieldAlert, CheckCircle2, RefreshCw, Zap, Target, TrendingUp, Database, Loader2 } from 'lucide-react';
 import api from '../services/api';
-import { scoreTransaction } from '../services/mlApi';
+import CountUp from 'react-countup';
+import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
+import { getExplanation, getShap, scoreTransaction } from '../services/mlApi';
+
+ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const attackVectors = [
-  { id: 'card_testing', name: 'Card Testing', description: 'Multiple small transactions to test valid cards', risk: 'High' },
-  { id: 'velocity', name: 'Velocity Attack', description: 'Rapid successive transactions from same source', risk: 'High' },
-  { id: 'account_takeover', name: 'Account Takeover', description: 'Suspicious login patterns and transaction changes', risk: 'Critical' },
-  { id: 'geo_imposter', name: 'Geo Impersonation', description: 'Transactions from impossible travel distances', risk: 'Medium' },
-  { id: 'mule', name: 'Money Mule', description: 'Layering transfers through intermediary accounts', risk: 'High' },
-  { id: 'phishing', name: 'Phishing Attack', description: 'Credential harvesting and fraudulent transactions', risk: 'Critical' },
+  { id: 'obvious_fraud', name: 'Obvious Fraud', description: 'High velocity, impossible travel, new device.', risk: 'Critical' },
+  { id: 'borderline', name: 'Borderline Suspicious', description: 'Unusual time, slightly larger amount, but known device.', risk: 'High' },
+  { id: 'legitimate', name: 'Clearly Legitimate', description: 'Standard grocery payment from home IP.', risk: 'Low' },
   { id: 'uco_bank', name: 'UCO Bank Pattern', description: 'ISO-8583 Process-and-Check logic inversion — credit before validation', risk: 'Critical' },
+  { id: 'custom', name: 'Custom Attack', description: 'Configure specific fraud parameters manually.', risk: 'Custom' },
 ];
 
 interface SimResult {
@@ -22,8 +24,8 @@ interface SimResult {
   falsePos: number;
 }
 
-export default function Simulator() {
-  const [selectedVector, setSelectedVector] = useState('card_testing');
+export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+  const [selectedVector, setSelectedVector] = useState('obvious_fraud');
   const [isRunning, setIsRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const [results, setResults] = useState<SimResult[]>([]);
@@ -32,9 +34,24 @@ export default function Simulator() {
   const [mlFraudType, setMlFraudType] = useState<string | null>(null);
   const [mlRiskLevel, setMlRiskLevel] = useState<string | null>(null);
   const [mlLime, setMlLime] = useState<any[]>([]);
+  const [mlShap, setMlShap] = useState<any | null>(null);
   const [currentTxnId, setCurrentTxnId] = useState<string>('');
+  const chartRef = useRef<ChartJS | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  function getVectorScore(vectorId: string, iteration: number): number {
+  const [customParams, setCustomParams] = useState({
+    amount_inr: 5000,
+    hour: 14,
+    city_risk_score: 0.5,
+    is_new_device: 1,
+    category: 'cat_electronics',
+    velocity_60s: 5,
+  });
+
+  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
+  let chartInstance: ChartJS | null = null;
+
+  function getVectorScore(vectorId: string): number {
     const baseScores: Record<string, number> = {
       card_testing: 88,
       velocity: 91,
@@ -44,10 +61,7 @@ export default function Simulator() {
       phishing: 86,
       uco_bank: 96,
     };
-    const base = baseScores[vectorId] || 85;
-    const variance = (iteration % 3 === 0 ? -8 :
-      iteration % 3 === 1 ? +4 : -2);
-    return Math.min(99, Math.max(60, base + variance));
+    return baseScores[vectorId] || 85;
   }
 
   const startSimulation = async () => {
@@ -63,18 +77,58 @@ export default function Simulator() {
     const txnId = `sim_${selectedVector}_${Date.now()}`;
     setCurrentTxnId(txnId);
 
+    let customPayload = undefined;
+    if (selectedVector === 'custom') {
+      customPayload = {
+        amount_inr: customParams.amount_inr,
+        amount_scaled: customParams.amount_inr / 20000,
+        hour: customParams.hour,
+        velocity_60s: customParams.velocity_60s,
+        is_new_device: customParams.is_new_device,
+        is_new_recipient: 1,
+        account_age_days: 10,
+        city_risk_score: customParams.city_risk_score,
+        is_festival_day: 0,
+        is_sim_swap_signal: customParams.is_new_device,
+        is_round_amount: customParams.amount_inr % 1000 === 0 ? 1 : 0,
+        cat_crypto: customParams.category === 'cat_crypto' ? 1 : 0,
+        cat_grocery: customParams.category === 'cat_grocery' ? 1 : 0,
+        cat_electronics: customParams.category === 'cat_electronics' ? 1 : 0,
+        cat_travel: customParams.category === 'cat_travel' ? 1 : 0,
+        V14: -10.0, V4: 4.0, V12: -8.0, V10: -6.0, V11: -3.0,
+      };
+    }
+
     // Call real ML backend
-    const mlResult = await scoreTransaction(selectedVector, txnId);
+    const mlResult = await scoreTransaction(selectedVector, txnId, customPayload);
 
     // Animate logs using ML score as baseline
-    const baseScore = mlResult?.score ?? getVectorScore(selectedVector, 0);
+    const baseScore = mlResult?.score ?? getVectorScore(selectedVector);
     const logs: typeof simLogs = [];
+
+    // Simulate 8 requests but ping the ML backend for real variance if available
     for (let i = 0; i < 8; i++) {
-      await new Promise(r => setTimeout(r, 300));
-      // Vary around the real ML score for visual realism
-      const variance = (i % 3 === 0 ? -8 : i % 3 === 1 ? +4 : -2);
-      const score = Math.min(99, Math.max(40, baseScore + variance));
+      let currentIterScore = baseScore;
+
+      if (selectedVector === 'custom') {
+        // for custom, add random jitter
+        const variance = (Math.random() * 10) - 5;
+        currentIterScore = Math.min(99, Math.max(1, baseScore + variance));
+      } else {
+        // Fetch a real jittered score from the backend by passing a unique txnId
+        const iterTxnId = `${txnId}_iter_${i}`;
+        const iterRes = await scoreTransaction(selectedVector, iterTxnId, customPayload);
+        if (iterRes && iterRes.score) {
+          currentIterScore = iterRes.score;
+        } else {
+          const variance = (i % 3 === 0 ? -8 : i % 3 === 1 ? +4 : -2);
+          currentIterScore = Math.min(99, Math.max(40, baseScore + variance));
+        }
+      }
+
+      const score = Math.round(currentIterScore * 10) / 10;
       const status = score >= 75 ? 'BLOCKED' : score >= 40 ? 'FLAGGED' : 'PASSED';
+
       logs.push({
         id: 1000 + i + 1,
         time: `00:0${Math.floor(i / 2)}:${String((i * 7) % 60).padStart(2, '0')}`,
@@ -83,6 +137,7 @@ export default function Simulator() {
       });
       setSimLogs([...logs]);
       setSimProgress(Math.min(100, Math.round(((i + 1) / 8) * 100)));
+      await new Promise(r => setTimeout(r, 400));
     }
 
     // Store ML results for display
@@ -90,7 +145,24 @@ export default function Simulator() {
       setMlScore(mlResult.score);
       setMlFraudType(mlResult.fraud_type);
       setMlRiskLevel(mlResult.risk_level);
-      setMlLime(mlResult.lime || []);
+
+      Promise.all([
+        getExplanation(txnId),
+        getShap(txnId)
+      ]).then(([lime, shap]) => {
+        if (lime) setMlLime(lime);
+        if (shap) setMlShap(shap);
+      });
+
+      // Insert final evaluation into appwrite
+      api.createTransaction({
+        sender: 'sim_' + selectedVector,
+        receiver: 'merch_test',
+        amount: customPayload ? customPayload.amount_inr : mlResult.score > 75 ? 85000 : 2500,
+        score: Math.round(mlResult.score),
+        type: mlResult.fraud_type?.replace(/_/g, ' ') || 'Unknown',
+        status: mlResult.score >= 75 ? 'blocked' : mlResult.score >= 40 ? 'flagged' : 'clear'
+      }).catch(() => { });
     }
 
     const vectorStats: Record<string, { detection: number; block: number }> = {
@@ -202,6 +274,47 @@ export default function Simulator() {
             ))}
           </div>
 
+          {selectedVector === 'custom' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="glass-card p-4 rounded-xl mb-4 grid grid-cols-2 md:grid-cols-3 gap-4"
+            >
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Amount (₹)</label>
+                <input type="number" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.amount_inr} onChange={e => setCustomParams({ ...customParams, amount_inr: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Hour (0-23)</label>
+                <input type="number" min="0" max="23" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.hour} onChange={e => setCustomParams({ ...customParams, hour: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>City Risk (0-1)</label>
+                <input type="number" step="0.1" min="0" max="1" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.city_risk_score} onChange={e => setCustomParams({ ...customParams, city_risk_score: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Velocity (past 60s)</label>
+                <input type="number" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.velocity_60s} onChange={e => setCustomParams({ ...customParams, velocity_60s: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Device</label>
+                <select className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.is_new_device} onChange={e => setCustomParams({ ...customParams, is_new_device: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }}>
+                  <option value={0}>Known</option>
+                  <option value={1}>New</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Category</label>
+                <select className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.category} onChange={e => setCustomParams({ ...customParams, category: e.target.value })} style={{ borderColor: 'var(--border)' }}>
+                  <option value="cat_electronics">Electronics</option>
+                  <option value="cat_crypto">Crypto</option>
+                  <option value="cat_grocery">Grocery</option>
+                  <option value="cat_travel">Travel</option>
+                </select>
+              </div>
+            </motion.div>
+          )}
+
           {selectedVector === 'uco_bank' && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
@@ -217,7 +330,7 @@ export default function Simulator() {
                 accounts through ISO-8583 message mis-routing. The middleware used
                 "Process-and-Check" logic — credits were applied before message field validation.
                 When validation failed, the sender's bank received a refund but the receiver kept
-                the money. This preset simulates that exact pattern. FraudShield detects it via
+                the money. This preset simulates that exact pattern. Argus Eye detects it via
                 Circular Fund Flow analysis and velocity rules.
               </p>
             </motion.div>
@@ -335,11 +448,11 @@ export default function Simulator() {
                   color: mlScore >= 75 ? '#f43f5e' :
                     mlScore >= 40 ? '#fbbf24' : '#4ade80'
                 }}>
-                {mlScore.toFixed(1)}
+                <CountUp end={mlScore} duration={1.5} decimals={1} />
               </div>
               <div className={`text-sm mt-1 font-medium ${mlRiskLevel === 'HIGH' ? 'text-rose-400' :
-                  mlRiskLevel === 'MEDIUM' ? 'text-amber-400' :
-                    'text-emerald-400'
+                mlRiskLevel === 'MEDIUM' ? 'text-amber-400' :
+                  'text-emerald-400'
                 }`}>{mlRiskLevel} RISK</div>
               {mlFraudType && (
                 <div className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
@@ -348,6 +461,19 @@ export default function Simulator() {
                   </span>
                 </div>
               )}
+
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('investigationSelect', {
+                    detail: { caseType: mlFraudType?.replace(/_/g, ' ') || 'Suspicious' }
+                  }));
+                  onNavigate?.('investigation');
+                }}
+                className="mt-6 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all w-full flex items-center justify-between group border border-rose-500/20"
+              >
+                <span>Investigate Transaction</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </button>
             </div>
             <div className="col-span-2">
               <div className="text-xs uppercase tracking-wider mb-3"
@@ -389,6 +515,66 @@ export default function Simulator() {
               )}
             </div>
           </div>
+
+          {/* SHAP Radar Chart */}
+          {mlShap && (
+            <div className="mt-8 border-t pt-6" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-xs uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--muted)' }}>
+                SHAP Fraud DNA Fingerprint
+              </div>
+              <div className="w-full flex justify-center">
+                <div style={{ width: '300px', height: '300px' }}>
+                  <canvas ref={(el) => {
+                    if (el && !chartInstance) {
+                      const shapValues = [
+                        Math.abs(mlShap.velocity || 0),
+                        Math.abs(mlShap.device_risk || 0),
+                        Math.abs(mlShap.time_risk || 0),
+                        Math.abs(mlShap.amount_risk || 0),
+                        Math.abs(mlShap.recipient || 0),
+                        Math.abs(mlShap.network || 0),
+                        Math.abs(mlShap.identity || 0),
+                        Math.abs(mlShap.location || 0),
+                      ];
+                      const maxVal = Math.max(...shapValues, 0.01) * 1.2;
+                      chartInstance = new ChartJS(el, {
+                        type: 'radar',
+                        data: {
+                          labels: ['Velocity', 'Device', 'Time', 'Amount', 'Recipient', 'Network', 'Identity', 'Location'],
+                          datasets: [{
+                            label: 'Current Incident',
+                            data: shapValues,
+                            backgroundColor: 'rgba(244, 63, 94, 0.2)',
+                            borderColor: '#f43f5e',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#f43f5e',
+                            pointBorderColor: '#1e293b',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#f43f5e'
+                          }]
+                        },
+                        options: {
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: {
+                            r: {
+                              min: 0,
+                              max: maxVal,
+                              ticks: { display: false },
+                              grid: { color: 'rgba(255,255,255,0.1)' },
+                              angleLines: { color: 'rgba(255,255,255,0.1)' },
+                              pointLabels: { color: '#94a3b8', font: { size: 10, family: 'monospace' } }
+                            }
+                          },
+                          plugins: { legend: { display: false } }
+                        }
+                      });
+                    }
+                  }} />
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 

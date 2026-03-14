@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, AlertTriangle, Search, Share2,
-  BarChart3, Shield, Beaker, Settings, Sun, Moon, LogOut, Columns, Info
+  BarChart3, Shield, Beaker, Settings, Sun, Moon, LogOut, Columns, Info, Eye
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,7 +55,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
             whileHover={{ rotate: 10, scale: 1.1 }}
             transition={{ type: 'spring', stiffness: 300 }}
           >
-            <Shield className="w-5 h-5" />
+            <Eye className="w-5 h-5" />
           </motion.div>
           <div>
             <h2 className="font-bold text-sm tracking-tight" style={{ color: 'var(--text)' }}>Argus Eye</h2>

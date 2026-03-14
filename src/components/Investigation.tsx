@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity, Loader2 } from 'lucide-react';
 import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, RadialBarChart, RadialBar, Cell } from 'recharts';
 import api from '../services/api';
 import { getExplanation, getShap, getTimeline, getRecommendations, retrainModel } from '../services/mlApi';
 
@@ -61,9 +62,9 @@ const SHAP_LABELS = [
 ];
 
 const FINGERPRINTS = {
-  velocity_attack: [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
-  sim_swap: [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
-  social_engineering: [0.1, 0.3, 0.7, 0.6, 0.9, 0.2, 0.3, 0.2],
+  phishing: [0.3, 0.5, 0.6, 0.6, 0.85, 0.4, 0.5, 0.3],
+  card_testing: [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
+  account_takeover: [0.2, 0.85, 0.9, 0.7, 0.4, 0.3, 0.6, 0.5],
 };
 
 const mockCases = [
@@ -179,21 +180,33 @@ export default function Investigation() {
               pointRadius: 3,
             },
             {
-              label: 'Velocity pattern',
-              data: FINGERPRINTS.velocity_attack,
-              borderColor: 'rgba(251,113,133,0.4)',
-              backgroundColor: 'transparent',
+              label: 'Phishing Ref',
+              data: FINGERPRINTS.phishing,
+              borderColor: 'rgba(52,211,153,0.3)',
+              backgroundColor: 'rgba(52,211,153,0.15)',
               borderWidth: 1,
               borderDash: [4, 4],
+              fill: true,
               pointRadius: 0,
             },
             {
-              label: 'SIM Swap pattern',
-              data: FINGERPRINTS.sim_swap,
-              borderColor: 'rgba(251,191,36,0.4)',
-              backgroundColor: 'transparent',
+              label: 'Card Testing Ref',
+              data: FINGERPRINTS.card_testing,
+              borderColor: 'rgba(251,191,36,0.3)',
+              backgroundColor: 'rgba(251,191,36,0.15)',
               borderWidth: 1,
               borderDash: [4, 4],
+              fill: true,
+              pointRadius: 0,
+            },
+            {
+              label: 'Account Takeover Ref',
+              data: FINGERPRINTS.account_takeover,
+              borderColor: 'rgba(167,139,250,0.3)',
+              backgroundColor: 'rgba(167,139,250,0.15)',
+              borderWidth: 1,
+              borderDash: [4, 4],
+              fill: true,
               pointRadius: 0,
             },
           ]
@@ -255,11 +268,12 @@ export default function Investigation() {
     getExplanation(selectedCase.id).then(lime => {
       if (lime && lime.length > 0) {
         const bars = lime
-          .filter((r: any) => r.direction === 'RISK')
+          .slice(0, 5)
           .map((r: any) => ({
             label: r.feature.split(' ')[0].replace(/_/g, ' '),
-            width: `${Math.min(99, Math.max(5, r.weight * 8000))}%`,
-            color: r.weight > 0.005 ? '#f43f5e' : '#f59e0b',
+            value: Number((r.weight * 100).toFixed(1)),
+            width: `${Math.min(99, Math.max(5, Math.abs(r.weight) * 8000))}%`,
+            color: r.weight > 0 ? '#f43f5e' : '#10b981',
           }));
         if (bars.length > 0) setMlLimeBars(bars);
       }
@@ -544,31 +558,31 @@ export default function Investigation() {
                   );
                 })()}
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="glass-card p-5 rounded-xl">
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
-                  <div className="w-full space-y-3 mt-3" key={selectedCase.$id}>
-                    {(mlLimeBars || limeBars).map(bar => (
-                      <div key={bar.label} className="flex items-center gap-2">
-                        <span className="text-xs w-24 text-right" style={{ color: 'var(--muted)' }}>{bar.label}</span>
-                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                          <motion.div
-                            key={`${selectedCase.$id}-${bar.label}`}
-                            initial={{ width: 0 }}
-                            animate={{ width: bar.width }}
-                            transition={{ duration: 1, delay: 0.5 }}
-                            className="h-full rounded-full"
-                            style={{ backgroundColor: bar.color }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                  <div className="w-full h-[180px] mt-3" key={`lime-${selectedCase.$id}`}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mlLimeBars || limeBars} layout="vertical" margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="label" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} width={80} />
+                        <RechartsTooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(51,65,85,0.5)', borderRadius: '8px', fontSize: '10px', color: '#f8fafc' }} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={12}>
+                          {Array.isArray(mlLimeBars) ? mlLimeBars.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || '#f43f5e'} />
+                          )) : limeBars.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || '#f43f5e'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="glass-card p-5 rounded-xl">
+                <div className="glass-card p-5 rounded-xl relative">
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>SHAP Fraud DNA</h4>
-                  <div className="h-[200px]">
+                  <div className="h-[200px] z-10 relative">
                     <canvas key={selectedCase.$id} ref={canvasRef} />
                   </div>
                 </div>
@@ -663,23 +677,14 @@ export default function Investigation() {
                     style={{ color: 'var(--muted)' }}>
                     Recovery Probability
                   </h4>
-                  <div className="flex items-center gap-6">
-                    <div className="relative w-20 h-20 flex-shrink-0">
-                      <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
-                        <circle cx="40" cy="40" r="32" fill="none" strokeWidth="6"
-                          style={{ stroke: 'var(--border)' }} />
-                        <motion.circle
-                          cx="40" cy="40" r="32" fill="none" strokeWidth="6"
-                          strokeLinecap="round"
-                          strokeDasharray={201.06}
-                          initial={{ strokeDashoffset: 201.06 }}
-                          animate={{ strokeDashoffset: 201.06 - (201.06 * recoveryProb / 100) }}
-                          transition={{ duration: 1, delay: 0.3 }}
-                          stroke={recoveryColor}
-                          key={selectedCase.$id}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-6 mt-4">
+                    <div className="relative w-24 h-24 flex-shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={8} data={[{ name: 'recovery', value: recoveryProb, fill: recoveryColor }]}>
+                          <RadialBar background={{ fill: 'rgba(255,255,255,0.05)' }} dataKey="value" cornerRadius={4} />
+                        </RadialBarChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex items-center justify-center -mt-1">
                         <span className="text-lg font-bold" style={{ color: recoveryColor }}>
                           {recoveryProb}%
                         </span>
@@ -690,8 +695,14 @@ export default function Investigation() {
                         {recoveryAction}
                       </div>
                       <div className="text-xs" style={{ color: 'var(--muted)' }}>
-                        Probability decays 3% per hour. Act now to maximise recovery.
+                        Drops 3% per hour — act now to maximise recovery.
                       </div>
+                      {recoveryProb > 60 && (
+                        <div className="text-xs font-bold text-emerald-400 mt-2 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded inline-block w-fit border border-emerald-500/20">
+                          <Clock className="w-3 h-3" />
+                          <span className="animate-pulse">00:59:{(59 - new Date().getSeconds()).toString().padStart(2, '0')}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

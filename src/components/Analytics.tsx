@@ -38,6 +38,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
   const [forecastData, setForecastData] = useState<
     { name: string; forecast: number; lower: number; upper: number }[]
   >([]);
+  const [expandedInsight, setExpandedInsight] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -254,23 +255,76 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
         <h3 className="text-lg font-bold mb-4" style={{ color: 'var(--text)' }}>Predictive Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { title: 'Upcoming Holiday Surge', desc: 'Model predicts a 45% increase in Card Testing attacks over the upcoming Diwali weekend.', color: 'amber', cta: 'View Mitigation Plan →', action: () => onNavigate?.('simulator') },
-            { title: 'New Phishing Campaign', desc: 'Detected a novel phishing template targeting HDFC Bank customers. Expected impact: High.', color: 'rose', cta: 'Update Ruleset →', action: () => onNavigate?.('simulator') },
-            { title: 'Model Performance', desc: 'False positive rate decreased by 2.1% this week following the latest model retraining.', color: 'emerald', cta: 'View Metrics →', action: () => onNavigate?.('dashboard') },
+            {
+              title: 'Upcoming Holiday Surge',
+              desc: 'Model predicts a 45% increase in Card Testing attacks over the upcoming Diwali weekend.',
+              color: 'amber',
+              cta: 'View Mitigation Plan →',
+              action: () => onNavigate?.('simulator'),
+              details: { score: 92, timeframe: 'Nov 12-15', confidence: 'High' }
+            },
+            {
+              title: 'New Phishing Campaign',
+              desc: 'Detected a novel phishing template targeting HDFC Bank customers. Expected impact: High.',
+              color: 'rose',
+              cta: 'Update Ruleset →',
+              action: () => onNavigate?.('simulator'),
+              details: { score: 88, timeframe: 'Last 48 hours', confidence: 'Critical' }
+            },
+            {
+              title: 'Model Performance',
+              desc: 'False positive rate decreased by 2.1% this week following the latest model retraining.',
+              color: 'emerald',
+              cta: 'View Metrics →',
+              action: () => onNavigate?.('dashboard'),
+              details: { score: 1.2, timeframe: 'This Week', confidence: 'Verified' }
+            },
           ].map((insight, i) => (
             <motion.div
+              layout
               key={i}
-              whileHover={{ y: -3 }}
-              className={`glass-card p-5 rounded-xl border-l-4 border-${insight.color}-400`}
+              whileHover={{ y: expandedInsight === i ? 0 : -3 }}
+              onClick={() => setExpandedInsight(expandedInsight === i ? null : i)}
+              className={`glass-card p-5 rounded-xl border-l-4 cursor-pointer overflow-hidden transition-colors border-${insight.color}-400 ${expandedInsight === i ? `bg-${insight.color}-500/5` : 'hover:bg-white/5'
+                }`}
             >
-              <h4 className="text-sm font-bold mb-2" style={{ color: 'var(--text)' }}>{insight.title}</h4>
-              <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>{insight.desc}</p>
-              <button
-                onClick={insight.action}
-                className={`text-xs font-medium text-${insight.color}-400 hover:text-${insight.color}-300 transition-colors`}
+              <motion.h4 layout="position" className="text-sm font-bold mb-2" style={{ color: 'var(--text)' }}>
+                {insight.title}
+              </motion.h4>
+              <motion.p layout="position" className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
+                {insight.desc}
+              </motion.p>
+
+              {expandedInsight === i && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-4 pt-4 border-t border-white/10"
+                >
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="text-center p-2 rounded-lg bg-black/20">
+                      <div className="text-[10px] text-slate-400 uppercase">Impact</div>
+                      <div className="text-sm font-bold text-white">{insight.details.score}</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-black/20">
+                      <div className="text-[10px] text-slate-400 uppercase">Window</div>
+                      <div className="text-xs font-bold text-white mt-1">{insight.details.timeframe}</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-black/20">
+                      <div className="text-[10px] text-slate-400 uppercase">Status</div>
+                      <div className={`text-xs font-bold mt-1 text-${insight.color}-400`}>{insight.details.confidence}</div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              <motion.button
+                layout="position"
+                onClick={(e) => { e.stopPropagation(); insight.action(); }}
+                className={`text-xs font-medium text-${insight.color}-400 hover:text-${insight.color}-300 transition-colors mt-2 block`}
               >
                 {insight.cta}
-              </button>
+              </motion.button>
             </motion.div>
           ))}
         </div>

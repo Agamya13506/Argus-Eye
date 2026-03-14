@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Shield, Eye, Lock, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
+import CountUp from 'react-countup';
 
 export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; key?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -498,6 +499,27 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; ke
         .defi-label { position: absolute; bottom: 50px; right: 48px; font-size: 12px; color: var(--muted); }
         .defi-label span { display: block; width: 24px; height: 1px; background: var(--muted); margin-top: 6px; opacity: .4; }
 
+        .stats-strip {
+          position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+          border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+          padding: 16px 0; background: rgba(12,6,7,0.7); overflow: hidden;
+          backdrop-filter: blur(16px);
+        }
+        .stats-strip::before,.stats-strip::after {
+          content: ''; position: absolute; top: 0; bottom: 0; width: 140px; z-index: 2;
+        }
+        .stats-strip::before { left: 0; background: linear-gradient(to right, rgba(12,6,7,1), transparent); }
+        .stats-strip::after  { right: 0; background: linear-gradient(to left, rgba(12,6,7,1), transparent); }
+        .stats-track { display: flex; gap: 80px; white-space: nowrap; animation: statsSlide 35s linear infinite; }
+        .stat-ticker-item {
+          display: flex; align-items: center; gap: 12px;
+          font-family: 'Syne', sans-serif; flex-shrink: 0;
+        }
+        .stat-ticker-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;}
+        .stat-ticker-value { font-size: 20px; color: var(--text); font-weight: 800; display: flex; align-items: baseline; }
+        .stat-ticker-value span { color: var(--accent); }
+        @keyframes statsSlide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
         .logos-strip {
           position: relative; z-index: 1;
           border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
@@ -678,7 +700,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; ke
       <div className="cursor-ring" id="cursorRing"></div>
 
       <nav className="landing-nav">
-        <div className="nav-logo">◎</div>
+        <div className="nav-logo"><Eye className="w-5 h-5" /></div>
         <ul className="nav-links">
           <li><a href="#">Home</a></li>
           <li><a href="#">Features</a></li>
@@ -733,8 +755,52 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; ke
             <div key={i} className="bar" style={{ height: `${28 + Math.random() * 60}px` }}></div>
           ))}
         </div>
-        <div className="scroll-hint"><div className="scroll-btn">↓</div> 02/03 · Scroll down</div>
-        <div className="defi-label">Fraud Prevention<span></span></div>
+        <div className="scroll-hint" style={{ bottom: '90px' }}><div className="scroll-btn">↓</div> 02/03 · Scroll down</div>
+        <div className="defi-label" style={{ bottom: '80px' }}>Fraud Prevention<span></span></div>
+        <div className="stats-strip">
+          <div className="stats-track">
+            {[1, 2].map((group) => (
+              <div key={group} style={{ display: 'flex', gap: '80px' }}>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Total Protected</div>
+                  <div className="stat-ticker-value text-[var(--accent)]">
+                    <span>₹</span><CountUp end={847} duration={2} delay={0.2} separator="," /><span>M+</span>
+                  </div>
+                </div>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Nodes Analyzed</div>
+                  <div className="stat-ticker-value">
+                    <CountUp end={1.2} decimals={1} duration={2} delay={0.4} /><span>M+</span>
+                  </div>
+                </div>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Detection Rate</div>
+                  <div className="stat-ticker-value text-[var(--emerald-400)]">
+                    <CountUp end={99.98} decimals={2} duration={2} delay={0.6} /><span>%</span>
+                  </div>
+                </div>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Threats Blocked</div>
+                  <div className="stat-ticker-value">
+                    <CountUp end={843000} duration={2.5} delay={0.8} separator="," /><span>+</span>
+                  </div>
+                </div>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Avg Inference</div>
+                  <div className="stat-ticker-value">
+                    <CountUp end={45} duration={1.5} delay={1.0} /><span>ms</span>
+                  </div>
+                </div>
+                <div className="stat-ticker-item">
+                  <div className="stat-ticker-label">Events Processed</div>
+                  <div className="stat-ticker-value">
+                    <CountUp end={2.4} decimals={1} duration={2} delay={1.2} /><span>B+</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <div className="logos-strip">

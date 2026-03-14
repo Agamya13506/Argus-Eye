@@ -1,6 +1,6 @@
 const ML_BASE = 'http://localhost:8000';
 
-async function mlFetch(path: string, options?: RequestInit) {
+export async function mlFetch(path: string, options?: RequestInit) {
     try {
         const res = await fetch(`${ML_BASE}${path}`, {
             headers: { 'Content-Type': 'application/json' },
@@ -62,6 +62,30 @@ const VECTOR_PAYLOADS: Record<string, object> = {
         cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
         V14: -18.0, V4: 5.0, V12: -11.0, V10: -8.0, V11: -4.0,
     },
+    obvious_fraud: {
+        amount_inr: 85000, amount_scaled: 4.2, hour: 3,
+        velocity_60s: 25, is_new_device: 1, is_new_recipient: 1,
+        account_age_days: 2, city_risk_score: 0.9,
+        is_festival_day: 0, is_sim_swap_signal: 1, is_round_amount: 1,
+        cat_crypto: 1, cat_grocery: 0, cat_electronics: 0,
+        V14: -24.0, V4: 7.0, V12: -18.0, V10: -15.0, V11: -8.0,
+    },
+    borderline: {
+        amount_inr: 45000, amount_scaled: 2.2, hour: 23,
+        velocity_60s: 3, is_new_device: 0, is_new_recipient: 1,
+        account_age_days: 180, city_risk_score: 0.5,
+        is_festival_day: 1, is_sim_swap_signal: 0, is_round_amount: 1,
+        cat_crypto: 0, cat_grocery: 0, cat_travel: 1,
+        V14: -10.0, V4: 2.0, V12: -5.0, V10: -4.0, V11: -2.0,
+    },
+    legitimate: {
+        amount_inr: 2500, amount_scaled: 0.1, hour: 14,
+        velocity_60s: 1, is_new_device: 0, is_new_recipient: 0,
+        account_age_days: 900, city_risk_score: 0.1,
+        is_festival_day: 0, is_sim_swap_signal: 0, is_round_amount: 0,
+        cat_crypto: 0, cat_grocery: 1, cat_electronics: 0,
+        V14: 1.0, V4: -1.0, V12: 1.0, V10: 1.0, V11: 0.5,
+    },
     uco_bank: {
         amount_inr: 150000, amount_scaled: 6.0, hour: 2,
         velocity_60s: 15, is_new_device: 1, is_new_recipient: 1,
@@ -74,9 +98,10 @@ const VECTOR_PAYLOADS: Record<string, object> = {
 
 export async function scoreTransaction(
     vectorId: string,
-    txnId: string
+    txnId: string,
+    customPayload?: any
 ): Promise<any | null> {
-    const payload = VECTOR_PAYLOADS[vectorId];
+    const payload = customPayload || VECTOR_PAYLOADS[vectorId];
     if (!payload) return null;
     return mlFetch('/score', {
         method: 'POST',

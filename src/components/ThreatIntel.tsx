@@ -37,7 +37,8 @@ export default function ThreatIntel() {
           })));
         }
       } catch (e) {
-        // use mock data
+        console.warn('ThreatIntel offline fallback mock active');
+        setThreats(mockThreats);
       } finally {
         setLoading(false);
       }
@@ -76,11 +77,12 @@ export default function ThreatIntel() {
       t.$id === id ? { ...t, status: 'CONFIRMED' } : t
     ));
     try {
-      await api.confirmThreat(id);
+      if (api.confirmThreat) {
+        await api.confirmThreat(id);
+      }
     } catch (e) {
-      setThreats((prev: any[]) => prev.map((t: any) =>
-        t.$id === id ? { ...t, ...prev } : t
-      ));
+      // Offline fallback: keep the optimistic update in the UI for the demo
+      console.warn('ThreatIntel offline mock update (Confirm)');
     } finally {
       setProcessingId(null);
     }
@@ -93,11 +95,11 @@ export default function ThreatIntel() {
       t.$id === id ? { ...t, status: 'BLOCKLISTED' } : t
     ));
     try {
-      await api.blocklistThreat(id);
+      if (api.blocklistThreat) {
+        await api.blocklistThreat(id);
+      }
     } catch (e) {
-      setThreats((prev: any[]) => prev.map((t: any) =>
-        t.$id === id ? { ...t, ...prev } : t
-      ));
+      console.warn('ThreatIntel offline mock update (Blocklist)');
     } finally {
       setProcessingId(null);
     }
@@ -109,9 +111,11 @@ export default function ThreatIntel() {
     const prevThreats = [...threats];
     setThreats((prev: any[]) => prev.filter((t: any) => t.$id !== id));
     try {
-      await api.dismissThreat(id);
+      if (api.dismissThreat) {
+        await api.dismissThreat(id);
+      }
     } catch (e) {
-      setThreats(prevThreats);
+      console.warn('ThreatIntel offline mock update (Dismiss)');
     } finally {
       setProcessingId(null);
     }
@@ -137,159 +141,176 @@ export default function ThreatIntel() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setSourceFilter(prev => prev === 'USER' ? null : 'USER')}
+            onClick={() => setSourceFilter(null)}
+            className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
+                        flex items-center gap-1 rounded-lg ${!sourceFilter
+                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                : 'text-blue-300 hover:bg-blue-400/10'
+              }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSourceFilter('USER')}
             className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
                         flex items-center gap-1 rounded-lg ${sourceFilter === 'USER'
                 ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                : 'text-rose-300 hover:bg-rose-400/10'
+                : 'text-teal-400 hover:bg-teal-500/10'
               }`}
           >
-            <Users className="w-3 h-3" /> User Reports
-            {sourceFilter === 'USER' && <span className="ml-1 text-[10px]">✕</span>}
+            <Users className="w-3 h-3" /> User
           </button>
           <button
-            onClick={() => setSourceFilter(prev => prev === 'ANALYST' ? null : 'ANALYST')}
+            onClick={() => setSourceFilter('ANALYST')}
             className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
                         flex items-center gap-1 rounded-lg ${sourceFilter === 'ANALYST'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                 : 'text-amber-400 hover:bg-amber-500/10'
               }`}
           >
-            <Shield className="w-3 h-3" /> Analyst Flags
-            {sourceFilter === 'ANALYST' && <span className="ml-1 text-[10px]">✕</span>}
+            <Shield className="w-3 h-3" /> Analyst
+          </button>
+          <button
+            onClick={() => setSourceFilter('BOTH')}
+            className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
+                        flex items-center gap-1 rounded-lg ${sourceFilter === 'BOTH'
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                : 'text-purple-400 hover:bg-purple-500/10'
+              }`}
+          >
+            <ShieldAlert className="w-3 h-3" /> Both
           </button>
         </div>
       </div>
 
       {/* Threat List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 relative">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-10 rounded-xl">
             <Loader2 className="w-8 h-8 text-rose-400 animate-spin" />
           </div>
-        ) : (
-          displayedThreats.map((threat, idx) => (
-            <motion.div
-              key={threat.$id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 + idx * 0.08 }}
-              whileHover={{ x: 4 }}
-              className="glass-card p-4 rounded-xl transition-all flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  {threat.status === 'CONFIRMED' || threat.status === 'BLOCKLISTED' ? (
-                    <ShieldAlert className="w-8 h-8 text-rose-400" />
-                  ) : threat.status === 'CORROBORATED' ? (
-                    <AlertTriangle className="w-8 h-8 text-amber-400" />
-                  ) : (
-                    <Search className="w-8 h-8 text-rose-400" />
-                  )}
-                  {threat.source === 'BOTH' && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 flex items-center justify-center" style={{ borderColor: 'var(--surface)' }}>
-                      <Users className="w-2 h-2 text-white" />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold font-mono" style={{ color: 'var(--text)' }}>{threat.entityId}</h3>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5" style={{ color: 'var(--muted)' }}>
-                      {threat.entityType}
-                    </span>
-                    <span
-                      className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
-                      style={{
-                        background: threat.source === 'USER' ? 'rgba(20,184,166,0.12)' :
-                          threat.source === 'ANALYST' ? 'rgba(244,63,94,0.12)' :
-                            'rgba(168,85,247,0.12)',
-                        color: threat.source === 'USER' ? '#2dd4bf' :
-                          threat.source === 'ANALYST' ? '#fb7185' :
-                            '#c084fc'
-                      }}
-                    >
-                      {threat.source}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3" /> {threat.reports} reports
-                    </span>
-                    <span>•</span>
-                    <span>{threat.time}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div style={{ width: '80px' }}>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
-                  <div className="text-lg font-bold" style={{
-                    color: threat.score >= 86 ? '#f43f5e' :
-                      threat.score >= 61 ? '#f97316' :
-                        threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
-                  }}>
-                    {threat.score}
-                  </div>
-                  <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)', width: '80px' }}>
-                    <motion.div
-                      className="h-full rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${threat.score}%` }}
-                      transition={{ duration: 0.8, delay: 0.1 }}
-                      style={{
-                        background: threat.score >= 86 ? '#f43f5e' :
-                          threat.score >= 61 ? '#f97316' :
-                            threat.score >= 31 ? '#f59e0b' : '#64748b'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="w-32">
-                  <div className={`text-[10px] font-bold uppercase tracking-wider text-center py-1 rounded-md border ${threat.status === 'BLOCKLISTED' ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' :
-                    threat.status === 'CONFIRMED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' :
-                      threat.status === 'CORROBORATED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' :
-                        'bg-rose-500/10 text-rose-400 border-rose-500/15'
-                    }`}>
-                    {threat.status}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {threat.status !== 'CONFIRMED' && threat.status !== 'BLOCKLISTED' && (
-                    <button
-                      onClick={() => handleConfirm(threat.$id)}
-                      disabled={processingId === threat.$id}
-                      className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50"
-                      title="Confirm Threat"
-                    >
-                      {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleBlocklist(threat.$id)}
-                    disabled={processingId === threat.$id}
-                    className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50"
-                    title="Blocklist"
-                  >
-                    {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                  </button>
-                  <button
-                    onClick={() => handleDismiss(threat.$id)}
-                    disabled={processingId === threat.$id}
-                    className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
-                    title="Dismiss"
-                  >
-                    {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))
         )}
+        {displayedThreats.map((threat, idx) => (
+          <motion.div
+            key={threat.$id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 + idx * 0.08 }}
+            whileHover={{ x: 4 }}
+            className="glass-card p-4 rounded-xl transition-all flex flex-col md:flex-row items-start md:items-center justify-between group gap-4 md:gap-0"
+          >
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {threat.status === 'CONFIRMED' || threat.status === 'BLOCKLISTED' ? (
+                  <ShieldAlert className="w-8 h-8 text-rose-400" />
+                ) : threat.status === 'CORROBORATED' ? (
+                  <AlertTriangle className="w-8 h-8 text-amber-400" />
+                ) : (
+                  <Search className="w-8 h-8 text-rose-400" />
+                )}
+                {threat.source === 'BOTH' && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 flex items-center justify-center" style={{ borderColor: 'var(--surface)' }}>
+                    <Users className="w-2 h-2 text-white" />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold font-mono" style={{ color: 'var(--text)' }}>{threat.entityId}</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5" style={{ color: 'var(--muted)' }}>
+                    {threat.entityType}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
+                    style={{
+                      background: threat.source === 'USER' ? 'rgba(20,184,166,0.12)' :
+                        threat.source === 'ANALYST' ? 'rgba(244,63,94,0.12)' :
+                          'rgba(168,85,247,0.12)',
+                      color: threat.source === 'USER' ? '#2dd4bf' :
+                        threat.source === 'ANALYST' ? '#fb7185' :
+                          '#c084fc'
+                    }}
+                  >
+                    {threat.source}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3 h-3" /> {threat.reports} reports
+                  </span>
+                  <span>•</span>
+                  <span>{threat.time}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div style={{ width: '80px' }}>
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
+                <div className="text-lg font-bold" style={{
+                  color: threat.score >= 86 ? '#f43f5e' :
+                    threat.score >= 61 ? '#f97316' :
+                      threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
+                }}>
+                  {threat.score}
+                </div>
+                <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)', width: '80px' }}>
+                  <motion.div
+                    className="h-full rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${threat.score}%` }}
+                    transition={{ duration: 0.8, delay: 0.1 }}
+                    style={{
+                      background: threat.score >= 86 ? '#f43f5e' :
+                        threat.score >= 61 ? '#f97316' :
+                          threat.score >= 31 ? '#f59e0b' : '#64748b'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="w-32">
+                <div className={`text-[10px] font-bold uppercase tracking-wider text-center py-1 rounded-md border ${threat.status === 'BLOCKLISTED' ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' :
+                  threat.status === 'CONFIRMED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' :
+                    threat.status === 'CORROBORATED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' :
+                      'bg-rose-500/10 text-rose-400 border-rose-500/15'
+                  }`}>
+                  {threat.status}
+                </div>
+              </div>
+
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {threat.status !== 'CONFIRMED' && threat.status !== 'BLOCKLISTED' && (
+                  <button
+                    onClick={() => handleConfirm(threat.$id)}
+                    disabled={processingId === threat.$id}
+                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50"
+                    title="Confirm Threat"
+                  >
+                    {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  </button>
+                )}
+                <button
+                  onClick={() => handleBlocklist(threat.$id)}
+                  disabled={processingId === threat.$id}
+                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50"
+                  title="Blocklist"
+                >
+                  {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => handleDismiss(threat.$id)}
+                  disabled={processingId === threat.$id}
+                  className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
+                  title="Dismiss"
+                >
+                  {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
       </div>
     </motion.div>
   );
