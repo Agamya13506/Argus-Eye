@@ -356,7 +356,7 @@ export default function Investigation() {
     const caseDetail = CASE_DETAILS[selectedCase.type] || CASE_DETAILS['Suspicious'];
     const recoveryProb = getRecoveryProb(selectedCase);
     const content = [
-      `FRAUDSHIELD INCIDENT REPORT`,
+      `ARGUS EYE INCIDENT REPORT`,
       `Generated: ${new Date().toLocaleString()}`,
       ``,
       `Case ID: ${selectedCase.id}`,
