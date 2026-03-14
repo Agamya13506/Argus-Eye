@@ -113,21 +113,21 @@ async function seedData() {
 // ─── GET ROUTES ───
 app.get('/api/transactions', async (req, res) => {
   try {
-    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/transactions/documents?queries[]=desc(timestamp)&limit=50`);
+    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/transactions/documents?limit=50`);
     res.json(response.documents || []);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.get('/api/threats', async (req, res) => {
   try {
-    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/threats/documents?queries[]=desc(score)&limit=50`);
+    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/threats/documents?limit=50`);
     res.json(response.documents || []);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.get('/api/cases', async (req, res) => {
   try {
-    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/cases/documents?queries[]=desc(createdAt)&limit=50`);
+    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/cases/documents?limit=50`);
     res.json(response.documents || []);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
