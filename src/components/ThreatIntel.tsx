@@ -14,6 +14,11 @@ export default function ThreatIntel() {
   const [threats, setThreats] = useState(mockThreats);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
+
+  const displayedThreats = sourceFilter
+    ? threats.filter((t: any) => t.source === sourceFilter)
+    : threats;
 
   useEffect(() => {
     async function fetchThreats() {
@@ -131,11 +136,27 @@ export default function ThreatIntel() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="glass-card px-3 py-1.5 text-xs font-medium text-rose-300 transition-colors flex items-center gap-1 rounded-lg hover:bg-rose-400/10">
+          <button
+            onClick={() => setSourceFilter(prev => prev === 'USER' ? null : 'USER')}
+            className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
+                        flex items-center gap-1 rounded-lg ${sourceFilter === 'USER'
+                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                : 'text-rose-300 hover:bg-rose-400/10'
+              }`}
+          >
             <Users className="w-3 h-3" /> User Reports
+            {sourceFilter === 'USER' && <span className="ml-1 text-[10px]">✕</span>}
           </button>
-          <button className="glass-card px-3 py-1.5 text-xs font-medium text-amber-400 transition-colors flex items-center gap-1 rounded-lg hover:bg-amber-500/10">
+          <button
+            onClick={() => setSourceFilter(prev => prev === 'ANALYST' ? null : 'ANALYST')}
+            className={`glass-card px-3 py-1.5 text-xs font-medium transition-colors
+                        flex items-center gap-1 rounded-lg ${sourceFilter === 'ANALYST'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                : 'text-amber-400 hover:bg-amber-500/10'
+              }`}
+          >
             <Shield className="w-3 h-3" /> Analyst Flags
+            {sourceFilter === 'ANALYST' && <span className="ml-1 text-[10px]">✕</span>}
           </button>
         </div>
       </div>
@@ -147,7 +168,7 @@ export default function ThreatIntel() {
             <Loader2 className="w-8 h-8 text-rose-400 animate-spin" />
           </div>
         ) : (
-          threats.map((threat, idx) => (
+          displayedThreats.map((threat, idx) => (
             <motion.div
               key={threat.$id}
               initial={{ opacity: 0, x: -20 }}
@@ -178,15 +199,15 @@ export default function ThreatIntel() {
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5" style={{ color: 'var(--muted)' }}>
                       {threat.entityType}
                     </span>
-                    <span 
+                    <span
                       className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
-                      style={{ 
-                        background: threat.source === 'USER' ? 'rgba(20,184,166,0.12)' : 
-                                   threat.source === 'ANALYST' ? 'rgba(244,63,94,0.12)' : 
-                                   'rgba(168,85,247,0.12)',
-                        color: threat.source === 'USER' ? '#2dd4bf' : 
-                               threat.source === 'ANALYST' ? '#fb7185' : 
-                               '#c084fc'
+                      style={{
+                        background: threat.source === 'USER' ? 'rgba(20,184,166,0.12)' :
+                          threat.source === 'ANALYST' ? 'rgba(244,63,94,0.12)' :
+                            'rgba(168,85,247,0.12)',
+                        color: threat.source === 'USER' ? '#2dd4bf' :
+                          threat.source === 'ANALYST' ? '#fb7185' :
+                            '#c084fc'
                       }}
                     >
                       {threat.source}
@@ -207,8 +228,8 @@ export default function ThreatIntel() {
                   <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
                   <div className="text-lg font-bold" style={{
                     color: threat.score >= 86 ? '#f43f5e' :
-                           threat.score >= 61 ? '#f97316' :
-                           threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
+                      threat.score >= 61 ? '#f97316' :
+                        threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
                   }}>
                     {threat.score}
                   </div>
@@ -220,8 +241,8 @@ export default function ThreatIntel() {
                       transition={{ duration: 0.8, delay: 0.1 }}
                       style={{
                         background: threat.score >= 86 ? '#f43f5e' :
-                                    threat.score >= 61 ? '#f97316' :
-                                    threat.score >= 31 ? '#f59e0b' : '#64748b'
+                          threat.score >= 61 ? '#f97316' :
+                            threat.score >= 31 ? '#f59e0b' : '#64748b'
                       }}
                     />
                   </div>
@@ -229,9 +250,9 @@ export default function ThreatIntel() {
 
                 <div className="w-32">
                   <div className={`text-[10px] font-bold uppercase tracking-wider text-center py-1 rounded-md border ${threat.status === 'BLOCKLISTED' ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' :
-                      threat.status === 'CONFIRMED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' :
-                        threat.status === 'CORROBORATED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' :
-                          'bg-rose-500/10 text-rose-400 border-rose-500/15'
+                    threat.status === 'CONFIRMED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' :
+                      threat.status === 'CORROBORATED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' :
+                        'bg-rose-500/10 text-rose-400 border-rose-500/15'
                     }`}>
                     {threat.status}
                   </div>

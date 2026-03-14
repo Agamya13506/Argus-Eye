@@ -40,6 +40,8 @@ export default function Settings() {
     const [alertThreshold, setAlertThreshold] = useState(75);
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [slackNotifications, setSlackNotifications] = useState(false);
+    const [auditRefreshing, setAuditRefreshing] = useState(false);
+    const [autoBlock, setAutoBlock] = useState(true);
 
     useEffect(() => {
         async function checkHealth() {
@@ -66,6 +68,12 @@ export default function Settings() {
         setUsers(prev => prev.map(u =>
             u.id === userId ? { ...u, role: newRole } : u
         ));
+    };
+
+    const handleRefreshAudit = async () => {
+        setAuditRefreshing(true);
+        await new Promise(r => setTimeout(r, 900));
+        setAuditRefreshing(false);
     };
 
     return (
@@ -99,8 +107,8 @@ export default function Settings() {
                                     key={section.id}
                                     onClick={() => setActiveSection(section.id)}
                                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeSection === section.id
-                                            ? 'bg-rose-500/10 text-rose-400'
-                                            : 'hover:bg-white/5'
+                                        ? 'bg-rose-500/10 text-rose-400'
+                                        : 'hover:bg-white/5'
                                         }`}
                                     style={activeSection !== section.id ? { color: 'var(--muted)' } : {}}
                                 >
@@ -230,7 +238,17 @@ export default function Settings() {
                                             <p className="text-xs" style={{ color: 'var(--muted)' }}>Automatically block transactions with risk score &gt; 90</p>
                                         </div>
                                         <div className="w-12 h-6 rounded-full bg-emerald-500 relative cursor-pointer">
-                                            <div className="absolute top-1 translate-x-6 w-4 h-4 rounded-full bg-white" />
+                                            <button
+                                                onClick={() => setAutoBlock(v => !v)}
+                                                className={`w-12 h-6 rounded-full relative transition-colors
+                                                            ${autoBlock ? 'bg-emerald-500' : 'bg-slate-500'}`}
+                                            >
+                                                <motion.div
+                                                    className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
+                                                    animate={{ x: autoBlock ? 24 : 2 }}
+                                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                                />
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between p-4 glass-card rounded-xl">
@@ -260,8 +278,16 @@ export default function Settings() {
                                 <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text)' }}>
                                     <Shield className="w-5 h-5 text-rose-400" /> Audit Logs
                                 </h3>
-                                <button className="px-3 py-1.5 rounded-lg glass-card text-xs font-medium flex items-center gap-1 hover:bg-white/5 transition-colors" style={{ color: 'var(--muted)' }}>
-                                    <RefreshCw className="w-3 h-3" /> Refresh
+                                <button
+                                    onClick={handleRefreshAudit}
+                                    disabled={auditRefreshing}
+                                    className="px-3 py-1.5 rounded-lg glass-card text-xs font-medium
+                                               flex items-center gap-1.5 hover:bg-white/5 transition-colors
+                                               disabled:opacity-50"
+                                    style={{ color: 'var(--muted)' }}
+                                >
+                                    <RefreshCw className={`w-3 h-3 ${auditRefreshing ? 'animate-spin' : ''}`} />
+                                    {auditRefreshing ? 'Refreshing...' : 'Refresh'}
                                 </button>
                             </div>
                             <div className="space-y-3">

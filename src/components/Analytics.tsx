@@ -25,7 +25,8 @@ const categoryData = [
 
 const barColors = ['#f43f5e', '#f59e0b', '#fb7185', '#f43f5e', '#2dd4bf'];
 
-export default function Analytics() {
+interface AnalyticsProps { onNavigate?: (tab: string) => void; key?: string; }
+export default function Analytics({ onNavigate }: AnalyticsProps) {
   const [timelineData, setTimelineData] = useState(mockTimeline);
   const [dateRange, setDateRange] = useState('7d');
 
@@ -122,9 +123,9 @@ export default function Analytics() {
             <option value="30d">Last 30 Days</option>
             <option value="90d">Last 90 Days</option>
           </select>
-          <button 
+          <button
             onClick={() => exportCSV(timelineData)}
-            className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5" 
+            className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5"
             style={{ color: 'var(--muted)' }}
           >
             <Download className="w-4 h-4" /> Export Report
@@ -206,9 +207,9 @@ export default function Analytics() {
         <h3 className="text-lg font-bold mb-4" style={{ color: 'var(--text)' }}>Predictive Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { title: 'Upcoming Holiday Surge', desc: 'Model predicts a 45% increase in Card Testing attacks over the upcoming Diwali weekend.', color: 'amber', cta: 'View Mitigation Plan →' },
-            { title: 'New Phishing Campaign', desc: 'Detected a novel phishing template targeting HDFC Bank customers. Expected impact: High.', color: 'rose', cta: 'Update Ruleset →' },
-            { title: 'Model Performance', desc: 'False positive rate decreased by 2.1% this week following the latest model retraining.', color: 'emerald', cta: 'View Metrics →' },
+            { title: 'Upcoming Holiday Surge', desc: 'Model predicts a 45% increase in Card Testing attacks over the upcoming Diwali weekend.', color: 'amber', cta: 'View Mitigation Plan →', action: () => onNavigate?.('simulator') },
+            { title: 'New Phishing Campaign', desc: 'Detected a novel phishing template targeting HDFC Bank customers. Expected impact: High.', color: 'rose', cta: 'Update Ruleset →', action: () => onNavigate?.('simulator') },
+            { title: 'Model Performance', desc: 'False positive rate decreased by 2.1% this week following the latest model retraining.', color: 'emerald', cta: 'View Metrics →', action: () => onNavigate?.('dashboard') },
           ].map((insight, i) => (
             <motion.div
               key={i}
@@ -217,7 +218,10 @@ export default function Analytics() {
             >
               <h4 className="text-sm font-bold mb-2" style={{ color: 'var(--text)' }}>{insight.title}</h4>
               <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>{insight.desc}</p>
-              <button className={`text-xs font-medium text-${insight.color}-400 hover:text-${insight.color}-300 transition-colors`}>
+              <button
+                onClick={insight.action}
+                className={`text-xs font-medium text-${insight.color}-400 hover:text-${insight.color}-300 transition-colors`}
+              >
                 {insight.cta}
               </button>
             </motion.div>

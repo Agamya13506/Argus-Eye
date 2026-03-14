@@ -59,14 +59,14 @@ async function initializeAppwrite() {
 
 async function seedData() {
   console.log('Checking for existing data...');
-  
+
   try {
     const existingTx = await appwriteFetch(`/databases/${DATABASE_ID}/collections/transactions/documents?limit=1`);
     if (existingTx.documents?.length > 0) {
       console.log('Data already exists, skipping seed');
       return;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   console.log('Seeding data...');
   const txData = [
@@ -196,11 +196,28 @@ app.post('/api/cases', async (req, res) => {
 app.patch('/api/cases/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const data = req.body;
     const response = await appwriteFetch(
       `/databases/${DATABASE_ID}/collections/cases/documents/${id}`,
       'PATCH',
-      { data: req.body }
+      { data }
     );
+
+    await appwriteFetch(
+      `/databases/${DATABASE_ID}/collections/audit_logs/documents`,
+      'POST',
+      {
+        documentId: ID.unique(),
+        data: {
+          action: `CASE_${data.status?.toUpperCase() || 'UPDATED'}`,
+          entityId: id,
+          analystId: 'analyst_001',
+          rbi_reference: '',
+          timestamp: new Date().toISOString()
+        }
+      }
+    );
+
     res.json(response);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -234,7 +251,7 @@ app.patch('/api/threats/:id/confirm', async (req, res) => {
       'PATCH',
       { data: { status: 'CONFIRMED', analyst_confirmed: true } }
     );
-    
+
     await appwriteFetch(
       `/databases/${DATABASE_ID}/collections/audit_logs/documents`,
       'POST',
@@ -249,7 +266,7 @@ app.patch('/api/threats/:id/confirm', async (req, res) => {
         }
       }
     );
-    
+
     res.json(updateResponse);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -262,7 +279,7 @@ app.patch('/api/threats/:id/blocklist', async (req, res) => {
       'PATCH',
       { data: { status: 'BLOCKLISTED' } }
     );
-    
+
     await appwriteFetch(
       `/databases/${DATABASE_ID}/collections/audit_logs/documents`,
       'POST',
@@ -276,7 +293,7 @@ app.patch('/api/threats/:id/blocklist', async (req, res) => {
         }
       }
     );
-    
+
     res.json(updateResponse);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -289,7 +306,7 @@ app.patch('/api/threats/:id/dismiss', async (req, res) => {
       'PATCH',
       { data: { status: 'DISMISSED' } }
     );
-    
+
     await appwriteFetch(
       `/databases/${DATABASE_ID}/collections/audit_logs/documents`,
       'POST',
@@ -303,7 +320,7 @@ app.patch('/api/threats/:id/dismiss', async (req, res) => {
         }
       }
     );
-    
+
     res.json(updateResponse);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });

@@ -96,7 +96,7 @@ export default function Compliance() {
 
   const exportFrameworkReport = () => {
     const header = 'Framework,Score,Status,Last Audit,Next Audit\n';
-    const rows = complianceFrameworks.map(f => 
+    const rows = complianceFrameworks.map(f =>
       `${f.name},${f.score},${f.status},${f.lastAudit},${f.nextAudit}`
     ).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
@@ -303,6 +303,17 @@ export default function Compliance() {
               <option>STR</option>
               <option>CTR</option>
               <option>SAR</option>
+            </select>
+            <select
+              value={filterTime}
+              onChange={(e) => setFilterTime(e.target.value)}
+              className="px-3 py-1.5 rounded-lg glass-card text-sm focus:outline-none"
+              style={{ color: 'var(--text-secondary)', background: 'var(--cardBg)' }}
+            >
+              <option value="30d">Last 30 Days</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="90d">Last 90 Days</option>
+              <option value="all">All Time</option>
             </select>
           </div>
         </div>

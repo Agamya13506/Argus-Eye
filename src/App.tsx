@@ -15,6 +15,7 @@ import Simulator from './components/Simulator';
 import SplitScreen from './components/SplitScreen';
 import LoginPage from './components/LoginPage';
 import Settings from './components/Settings';
+import AboutUs from './components/AboutUs';
 
 function AppContent() {
   const [loading, setLoading] = useState(true);
@@ -71,12 +72,13 @@ function AppContent() {
                   <ThreatIntel key="threat-intel" />
                 )}
                 {user && activeTab === 'investigation' && <Investigation key="investigation" />}
-                {user && activeTab === 'network' && <NetworkGraph key="network" />}
-                {user && activeTab === 'analytics' && <Analytics key="analytics" />}
+                {user && activeTab === 'network' && <NetworkGraph key="network" onNavigate={setActiveTab} />}
+                {user && activeTab === 'analytics' && <Analytics key="analytics" onNavigate={setActiveTab} />}
                 {user && activeTab === 'compliance' && <Compliance key="compliance" />}
                 {user && activeTab === 'simulator' && <Simulator key="simulator" />}
                 {user && activeTab === 'splitscreen' && <SplitScreen key="splitscreen" />}
                 {user && activeTab === 'settings' && <Settings key="settings" />}
+                {user && activeTab === 'about' && <AboutUs key="about" />}
               </AnimatePresence>
             </main>
           </div>

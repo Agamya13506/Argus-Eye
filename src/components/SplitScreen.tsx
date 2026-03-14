@@ -5,12 +5,12 @@ import { ShieldOff, Shield } from 'lucide-react';
 import api, { appwriteClient } from '../services/api';
 
 const MOCK_STREAM = [
-  { id: 1, sender:'user_492', receiver:'merch_88', amount:45000, score:85, type:'SIM Swap' },
-  { id: 2, sender:'user_112', receiver:'user_99',  amount:1200,  score:12, type:'None' },
-  { id: 3, sender:'user_77',  receiver:'merch_12', amount:8500,  score:65, type:'Suspicious' },
-  { id: 4, sender:'user_44',  receiver:'user_8',   amount:120000,score:92, type:'Account Takeover' },
-  { id: 5, sender:'user_321', receiver:'merch_55', amount:75000, score:78, type:'Card Testing' },
-  { id: 6, sender:'user_89',  receiver:'merch_33', amount:56000, score:88, type:'Phishing' },
+  { id: 1, sender: 'user_492', receiver: 'merch_88', amount: 45000, score: 85, type: 'SIM Swap' },
+  { id: 2, sender: 'user_112', receiver: 'user_99', amount: 1200, score: 12, type: 'None' },
+  { id: 3, sender: 'user_77', receiver: 'merch_12', amount: 8500, score: 65, type: 'Suspicious' },
+  { id: 4, sender: 'user_44', receiver: 'user_8', amount: 120000, score: 92, type: 'Account Takeover' },
+  { id: 5, sender: 'user_321', receiver: 'merch_55', amount: 75000, score: 78, type: 'Card Testing' },
+  { id: 6, sender: 'user_89', receiver: 'merch_33', amount: 56000, score: 88, type: 'Phishing' },
 ];
 
 export default function SplitScreen() {
@@ -29,8 +29,10 @@ export default function SplitScreen() {
             'databases.*.collections.*.documents.*.create')) {
             const tx = response.payload;
             setTransactions(prev => [
-              { id: Date.now(), sender: tx.sender, receiver: tx.receiver,
-                amount: tx.amount, score: tx.score, type: tx.type },
+              {
+                id: Date.now(), sender: tx.sender, receiver: tx.receiver,
+                amount: tx.amount, score: tx.score, type: tx.type
+              },
               ...prev
             ].slice(0, 20));
             if (tx.score >= 75) {
@@ -43,7 +45,7 @@ export default function SplitScreen() {
           }
         }
       );
-    } catch (e) {}
+    } catch (e) { }
     return () => { if (unsub) unsub(); };
   }, []);
 
@@ -63,15 +65,13 @@ export default function SplitScreen() {
 
   const txRow = (tx: typeof MOCK_STREAM[0], isProtected: boolean) => {
     const isfraud = tx.score >= 75;
-    const status = isProtected
-      ? (isfraud ? 'BLOCKED' : 'PASSED')
-      : 'PASSED';
+    const status = isProtected ? (isfraud ? 'BLOCKED' : 'PASSED') : 'PASSED';
     const color = isProtected
       ? (isfraud ? '#f43f5e' : '#4ade80')
-      : (isfraud ? '#f43f5e' : '#4ade80');
+      : '#4ade80';
     const bg = isProtected
       ? (isfraud ? 'rgba(244,63,94,0.1)' : 'rgba(74,222,128,0.08)')
-      : (isfraud ? 'rgba(244,63,94,0.05)' : 'rgba(74,222,128,0.08)');
+      : 'rgba(74,222,128,0.08)';
 
     return (
       <motion.div
@@ -111,7 +111,7 @@ export default function SplitScreen() {
     >
       <header className="mb-8">
         <h2 className="text-3xl font-bold tracking-tight mb-1 flex items-center gap-3"
-            style={{ color: 'var(--text)' }}>
+          style={{ color: 'var(--text)' }}>
           <Shield className="w-8 h-8" style={{ color: 'var(--accent)' }} />
           Protected vs Unprotected
         </h2>
@@ -123,7 +123,7 @@ export default function SplitScreen() {
       <div className="grid grid-cols-2 gap-6">
         <div className="glass-panel rounded-2xl overflow-hidden">
           <div className="p-5 border-b flex items-center justify-between"
-               style={{ borderColor: 'var(--border)', background: 'rgba(244,63,94,0.05)' }}>
+            style={{ borderColor: 'var(--border)', background: 'rgba(244,63,94,0.05)' }}>
             <div className="flex items-center gap-3">
               <ShieldOff className="w-5 h-5 text-rose-400" />
               <div>
@@ -137,7 +137,7 @@ export default function SplitScreen() {
             </div>
             <div className="text-right">
               <div className="text-xs uppercase tracking-wider mb-1"
-                   style={{ color: 'var(--muted)' }}>Fraud Loss</div>
+                style={{ color: 'var(--muted)' }}>Fraud Loss</div>
               <div className="text-xl font-bold text-rose-400">
                 ₹<CountUp end={lossWithout} duration={1} separator="," />
               </div>
@@ -150,7 +150,7 @@ export default function SplitScreen() {
 
         <div className="glass-panel rounded-2xl overflow-hidden">
           <div className="p-5 border-b flex items-center justify-between"
-               style={{ borderColor: 'var(--border)', background: 'rgba(74,222,128,0.05)' }}>
+            style={{ borderColor: 'var(--border)', background: 'rgba(74,222,128,0.05)' }}>
             <div className="flex items-center gap-3">
               <Shield className="w-5 h-5 text-emerald-400" />
               <div>
@@ -164,7 +164,7 @@ export default function SplitScreen() {
             </div>
             <div className="text-right">
               <div className="text-xs uppercase tracking-wider mb-1"
-                   style={{ color: 'var(--muted)' }}>Fraud Prevented</div>
+                style={{ color: 'var(--muted)' }}>Fraud Prevented</div>
               <div className="text-xl font-bold text-emerald-400">
                 ₹<CountUp end={fraudPrevented} duration={1} separator="," />
               </div>
@@ -174,14 +174,14 @@ export default function SplitScreen() {
             {transactions.slice(0, 10).map(tx => txRow(tx, true))}
           </div>
           <div className="p-4 border-t flex items-center justify-between"
-               style={{ borderColor: 'var(--border)' }}>
+            style={{ borderColor: 'var(--border)' }}>
             <span className="text-xs" style={{ color: 'var(--muted)' }}>
               {txBlockedCount} transactions blocked
             </span>
             <span className="text-xs font-bold text-emerald-400">
               {txBlockedCount > 0
                 ? `${Math.round((txBlockedCount /
-                    Math.max(transactions.length, 1)) * 100)}% detection rate`
+                  Math.max(transactions.length, 1)) * 100)}% detection rate`
                 : 'Monitoring...'}
             </span>
           </div>

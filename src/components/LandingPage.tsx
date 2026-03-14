@@ -726,7 +726,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; ke
         <p className="hero-sub">Protect your financial transactions with real-time ML-driven fraud detection, compliance management, and advanced threat intelligence.</p>
         <div className="hero-actions">
           <button className="btn-primary" onClick={onEnterApp}>Get Started ↗</button>
-          <button className="btn-secondary">View Demo</button>
+          <button className="btn-secondary" onClick={onEnterApp}>View Demo</button>
         </div>
         <div className="hero-chart" id="heroChart">
           {Array.from({ length: 20 }).map((_, i) => (
@@ -852,7 +852,7 @@ export default function LandingPage({ onEnterApp }: { onEnterApp: () => void; ke
         <h2 className="cta-title reveal">Start Protecting Your Transactions Today</h2>
         <div className="hero-actions" style={{ justifyContent: 'center' }}>
           <button className="btn-primary" onClick={onEnterApp}>Get Started ↗</button>
-          <button className="btn-secondary">Schedule Demo</button>
+          <button className="btn-secondary" onClick={onEnterApp}>Schedule Demo</button>
         </div>
       </section>
 

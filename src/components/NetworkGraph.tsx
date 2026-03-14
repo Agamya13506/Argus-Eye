@@ -57,7 +57,8 @@ const nodeColors: Record<string, string> = {
   suspicious: '#f59e0b',
 };
 
-export default function NetworkGraph() {
+interface NetworkGraphProps { onNavigate?: (tab: string) => void; key?: string; }
+export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
   const [nodes] = useState(defaultNodes);
   const [edges] = useState(defaultEdges);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -295,7 +296,15 @@ export default function NetworkGraph() {
               <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
                 A money mule network of 14 nodes with circular fund movement identified.
               </p>
-              <button className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('investigationSelect', {
+                    detail: { caseType: 'Money Mule' }
+                  }));
+                  onNavigate?.('investigation');
+                }}
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
+              >
                 Investigate →
               </button>
             </div>

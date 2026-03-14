@@ -7,61 +7,61 @@ import api from '../services/api';
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const LIME_BY_TYPE: Record<string, { label: string; width: string; color: string }[]> = {
-  'Account Takeover':  [
-    { label: 'Location',  width: '92%', color: '#f43f5e' },
-    { label: 'Velocity',  width: '85%', color: '#f43f5e' },
-    { label: 'Amount',    width: '78%', color: '#f59e0b' },
-    { label: 'Device',    width: '65%', color: '#f59e0b' },
+  'Account Takeover': [
+    { label: 'Location', width: '92%', color: '#f43f5e' },
+    { label: 'Velocity', width: '85%', color: '#f43f5e' },
+    { label: 'Amount', width: '78%', color: '#f59e0b' },
+    { label: 'Device', width: '65%', color: '#f59e0b' },
   ],
   'SIM Swap': [
     { label: 'New Device', width: '96%', color: '#f43f5e' },
     { label: 'Hour (3am)', width: '88%', color: '#f43f5e' },
-    { label: 'Amount',     width: '71%', color: '#f59e0b' },
-    { label: 'Velocity',   width: '44%', color: '#f59e0b' },
+    { label: 'Amount', width: '71%', color: '#f59e0b' },
+    { label: 'Velocity', width: '44%', color: '#f59e0b' },
   ],
   'Card Testing': [
-    { label: 'Velocity',   width: '98%', color: '#f43f5e' },
-    { label: 'Amount',     width: '45%', color: '#f59e0b' },
-    { label: 'Merchant',   width: '38%', color: '#f59e0b' },
-    { label: 'Device',     width: '22%', color: '#94a3b8' },
+    { label: 'Velocity', width: '98%', color: '#f43f5e' },
+    { label: 'Amount', width: '45%', color: '#f59e0b' },
+    { label: 'Merchant', width: '38%', color: '#f59e0b' },
+    { label: 'Device', width: '22%', color: '#94a3b8' },
   ],
   'Money Mule': [
-    { label: 'Recipient',  width: '89%', color: '#f43f5e' },
-    { label: 'Network',    width: '82%', color: '#f43f5e' },
-    { label: 'Amount',     width: '67%', color: '#f59e0b' },
-    { label: 'Velocity',   width: '51%', color: '#f59e0b' },
+    { label: 'Recipient', width: '89%', color: '#f43f5e' },
+    { label: 'Network', width: '82%', color: '#f43f5e' },
+    { label: 'Amount', width: '67%', color: '#f59e0b' },
+    { label: 'Velocity', width: '51%', color: '#f59e0b' },
   ],
   'Suspicious': [
-    { label: 'Velocity',   width: '72%', color: '#f43f5e' },
-    { label: 'Device',     width: '61%', color: '#f59e0b' },
-    { label: 'Amount',     width: '48%', color: '#f59e0b' },
-    { label: 'Hour',       width: '35%', color: '#94a3b8' },
+    { label: 'Velocity', width: '72%', color: '#f43f5e' },
+    { label: 'Device', width: '61%', color: '#f59e0b' },
+    { label: 'Amount', width: '48%', color: '#f59e0b' },
+    { label: 'Hour', width: '35%', color: '#94a3b8' },
   ],
   'Phishing': [
-    { label: 'Recipient',  width: '89%', color: '#f43f5e' },
-    { label: 'Network',    width: '75%', color: '#f43f5e' },
-    { label: 'Amount',     width: '62%', color: '#f59e0b' },
-    { label: 'Time',       width: '48%', color: '#f59e0b' },
+    { label: 'Recipient', width: '89%', color: '#f43f5e' },
+    { label: 'Network', width: '75%', color: '#f43f5e' },
+    { label: 'Amount', width: '62%', color: '#f59e0b' },
+    { label: 'Time', width: '48%', color: '#f59e0b' },
   ],
 };
 
 const SHAP_BY_TYPE: Record<string, number[]> = {
-  'Account Takeover':  [0.2, 0.85, 0.9, 0.7, 0.4, 0.3, 0.6, 0.5],
-  'SIM Swap':          [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
-  'Card Testing':      [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
-  'Money Mule':        [0.3, 0.2, 0.2, 0.4, 0.9, 0.8, 0.3, 0.2],
-  'Phishing':          [0.3, 0.5, 0.6, 0.6, 0.85, 0.4, 0.5, 0.3],
-  'Suspicious':        [0.5, 0.5, 0.5, 0.5, 0.5, 0.4, 0.4, 0.3],
+  'Account Takeover': [0.2, 0.85, 0.9, 0.7, 0.4, 0.3, 0.6, 0.5],
+  'SIM Swap': [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
+  'Card Testing': [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
+  'Money Mule': [0.3, 0.2, 0.2, 0.4, 0.9, 0.8, 0.3, 0.2],
+  'Phishing': [0.3, 0.5, 0.6, 0.6, 0.85, 0.4, 0.5, 0.3],
+  'Suspicious': [0.5, 0.5, 0.5, 0.5, 0.5, 0.4, 0.4, 0.3],
 };
 
 const SHAP_LABELS = [
-  'Velocity','Device','Time','Amount',
-  'Recipient','Network','Identity','Location'
+  'Velocity', 'Device', 'Time', 'Amount',
+  'Recipient', 'Network', 'Identity', 'Location'
 ];
 
 const FINGERPRINTS = {
-  velocity_attack:    [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
-  sim_swap:           [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
+  velocity_attack: [0.95, 0.4, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1],
+  sim_swap: [0.2, 0.95, 0.85, 0.8, 0.5, 0.3, 0.7, 0.2],
   social_engineering: [0.1, 0.3, 0.7, 0.6, 0.9, 0.2, 0.3, 0.2],
 };
 
@@ -118,11 +118,11 @@ const CASE_DETAILS: Record<string, {
 const getRecoveryProb = (caseData: typeof mockCases[0]) => {
   const baseProbMap: Record<string, number> = {
     'Account Takeover': 45,
-    'SIM Swap':         52,
-    'Card Testing':     78,
-    'Money Mule':       28,
-    'Phishing':         61,
-    'Suspicious':       70,
+    'SIM Swap': 52,
+    'Card Testing': 78,
+    'Money Mule': 28,
+    'Phishing': 61,
+    'Suspicious': 70,
   };
   const base = baseProbMap[caseData.type] || 55;
   const hoursElapsed = Math.max(0, (100 - caseData.priority) / 10);
@@ -136,6 +136,8 @@ export default function Investigation() {
   const [loading, setLoading] = useState(true);
   const chartRef = useRef<ChartJS<'radar'> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycDone, setKycDone] = useState(false);
 
   const limeBars = LIME_BY_TYPE[selectedCase.type] || LIME_BY_TYPE['Suspicious'];
 
@@ -165,7 +167,7 @@ export default function Investigation() {
             borderColor: 'rgba(251,113,133,0.4)',
             backgroundColor: 'transparent',
             borderWidth: 1,
-            borderDash: [4,4],
+            borderDash: [4, 4],
             pointRadius: 0,
           },
           {
@@ -174,7 +176,7 @@ export default function Investigation() {
             borderColor: 'rgba(251,191,36,0.4)',
             backgroundColor: 'transparent',
             borderWidth: 1,
-            borderDash: [4,4],
+            borderDash: [4, 4],
             pointRadius: 0,
           },
         ]
@@ -257,6 +259,16 @@ export default function Investigation() {
       await api.updateCase(selectedCase.$id, { status: 'VERIFIED' });
     } catch (e) { /* silent */ }
   };
+
+  const handleKYC = async () => {
+    setKycLoading(true);
+    await new Promise(r => setTimeout(r, 1200));
+    setKycLoading(false);
+    setKycDone(true);
+    setTimeout(() => setKycDone(false), 3000);
+  };
+
+  useEffect(() => { setKycDone(false); setKycLoading(false); }, [selectedCase.$id]);
 
   const handleGenerateReport = () => {
     const caseDetail = CASE_DETAILS[selectedCase.type] || CASE_DETAILS['Suspicious'];
@@ -353,10 +365,10 @@ export default function Investigation() {
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-mono text-sm font-bold" style={{ color: 'var(--text)' }}>{c.id}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${c.status === 'URGENT' ? 'bg-rose-500/20 text-rose-400' :
-                        c.status === 'HIGH' ? 'bg-amber-500/15 text-amber-400' :
-                          c.status === 'BLOCKED' ? 'bg-slate-500/15 text-slate-400' :
-                            c.status === 'VERIFIED' ? 'bg-emerald-500/15 text-emerald-400' :
-                              'bg-pink-500/15 text-pink-400'
+                      c.status === 'HIGH' ? 'bg-amber-500/15 text-amber-400' :
+                        c.status === 'BLOCKED' ? 'bg-slate-500/15 text-slate-400' :
+                          c.status === 'VERIFIED' ? 'bg-emerald-500/15 text-emerald-400' :
+                            'bg-pink-500/15 text-pink-400'
                       }`}>
                       {c.status === 'BLOCKED' || c.status === 'VERIFIED' ? c.status : `${c.priority} PTS`}
                     </span>
@@ -511,8 +523,18 @@ export default function Investigation() {
                     <div className="text-amber-400 font-medium text-sm">Request KYC Reverification</div>
                     <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Identity mismatch detected</div>
                   </div>
-                  <button className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-                    Execute
+                  <button
+                    onClick={handleKYC}
+                    disabled={kycLoading || kycDone}
+                    className="bg-amber-500 hover:bg-amber-600 disabled:opacity-60
+                               text-white px-4 py-1.5 rounded-lg text-sm font-medium
+                               transition-colors flex items-center gap-2 min-w-[80px] justify-center"
+                  >
+                    {kycLoading
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : kycDone
+                        ? '✓ Sent'
+                        : 'Execute'}
                   </button>
                 </div>
               </div>
@@ -521,24 +543,24 @@ export default function Investigation() {
             {(() => {
               const recoveryProb = getRecoveryProb(selectedCase);
               const recoveryColor = recoveryProb > 60 ? '#4ade80' :
-                                    recoveryProb > 30 ? '#fbbf24' : '#f43f5e';
+                recoveryProb > 30 ? '#fbbf24' : '#f43f5e';
               const recoveryAction = recoveryProb > 60
                 ? 'Process chargeback immediately — high recovery window'
                 : recoveryProb > 30
-                ? 'Escalate to senior analyst — window closing'
-                : 'Escalate to FIU-IND — low recovery probability';
+                  ? 'Escalate to senior analyst — window closing'
+                  : 'Escalate to FIU-IND — low recovery probability';
 
               return (
                 <div className="glass-card p-5 rounded-xl mb-6">
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-4"
-                      style={{ color: 'var(--muted)' }}>
+                    style={{ color: 'var(--muted)' }}>
                     Recovery Probability
                   </h4>
                   <div className="flex items-center gap-6">
                     <div className="relative w-20 h-20 flex-shrink-0">
                       <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
                         <circle cx="40" cy="40" r="32" fill="none" strokeWidth="6"
-                                style={{ stroke: 'var(--border)' }} />
+                          style={{ stroke: 'var(--border)' }} />
                         <motion.circle
                           cx="40" cy="40" r="32" fill="none" strokeWidth="6"
                           strokeLinecap="round"
