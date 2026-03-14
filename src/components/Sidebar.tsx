@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -34,10 +35,13 @@ const portalNames: Record<string, string> = {
 export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarProps) {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   if (!user) return null;
 
   const visibleItems = allNavItems.filter(item => item.roles.includes(user.role));
+  const currentPath = location.pathname.replace('/', '') || 'dashboard';
 
   return (
     <motion.aside
@@ -71,12 +75,12 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto stagger-children">
         {visibleItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = currentPath === item.id;
 
           return (
             <motion.button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => navigate(`/${item.id}`)}
               whileHover={{ x: 4 }}
               whileTap={{ scale: 0.97 }}
               className={`group w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden ${isActive

@@ -105,7 +105,7 @@ export async function scoreTransaction(
     if (!payload) return null;
     return mlFetch('/score', {
         method: 'POST',
-        body: JSON.stringify({ txn_id: txnId, ...payload }),
+        body: JSON.stringify({ txn_id: txnId, skip_explain: true, ...payload }),
     });
 }
 

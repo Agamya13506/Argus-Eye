@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth, UserRole } from './context/AuthContext';
@@ -19,9 +20,10 @@ import AboutUs from './components/AboutUs';
 
 function AppContent() {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('landing');
   const [qaOpen, setQaOpen] = useState(false);
   const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 3000);
@@ -42,22 +44,23 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  /* When user becomes null (logout), reset to login page */
   useEffect(() => {
-    if (!user && activeTab !== 'landing' && activeTab !== 'login') {
-      setActiveTab('login');
+    if (!user && location.pathname !== '/' && location.pathname !== '/login') {
+      navigate('/login', { replace: true });
     }
-  }, [user]);
+  }, [user, location.pathname, navigate]);
 
   const handleLogin = (role: UserRole) => {
     login(role);
-    setActiveTab('dashboard');
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
     logout();
-    setActiveTab('login');
+    navigate('/login');
   };
+
+  const isAuthPage = location.pathname === '/' || location.pathname === '/login';
 
   return (
     <>
@@ -68,32 +71,26 @@ function AppContent() {
           <Loader key="loader" onComplete={() => { }} />
         ) : (
           <div key="app" className="relative z-10 flex min-h-screen">
-            {activeTab !== 'landing' && user && (
-              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+            {user && !isAuthPage && (
+              <Sidebar activeTab="" setActiveTab={() => { }} onLogout={handleLogout} />
             )}
 
-            <main className={`flex-1 w-full ${activeTab !== 'landing' && user ? 'ml-64' : ''}`}>
+            <main className={`flex-1 w-full ${user && !isAuthPage ? 'ml-64' : ''}`}>
               <AnimatePresence mode="wait">
-                {activeTab === 'landing' && !user && (
-                  <LandingPage key="landing" onEnterApp={() => setActiveTab('login')} />
-                )}
-                {activeTab === 'login' && !user && (
-                  <LoginPage key="login" onLogin={handleLogin} />
-                )}
-                {user && activeTab === 'dashboard' && (
-                  <Dashboard key="dashboard" onNavigate={setActiveTab} />
-                )}
-                {user && activeTab === 'threat-intel' && (
-                  <ThreatIntel key="threat-intel" />
-                )}
-                {user && activeTab === 'investigation' && <Investigation key="investigation" />}
-                {user && activeTab === 'network' && <NetworkGraph key="network" onNavigate={setActiveTab} />}
-                {user && activeTab === 'analytics' && <Analytics key="analytics" onNavigate={setActiveTab} />}
-                {user && activeTab === 'compliance' && <Compliance key="compliance" />}
-                {user && activeTab === 'simulator' && <Simulator key="simulator" />}
-                {user && activeTab === 'splitscreen' && <SplitScreen key="splitscreen" />}
-                {user && activeTab === 'settings' && <Settings key="settings" />}
-                {user && activeTab === 'about' && <AboutUs key="about" />}
+                <Routes location={location} key={location.pathname}>
+                  <Route path="/" element={!user ? <LandingPage onEnterApp={() => navigate('/login')} /> : <Dashboard onNavigate={(n) => navigate(`/${n}`)} />} />
+                  <Route path="/login" element={!user ? <LoginPage onLogin={handleLogin} /> : <Dashboard onNavigate={(n) => navigate(`/${n}`)} />} />
+                  <Route path="/dashboard" element={user ? <Dashboard onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/threat-intel" element={user ? <ThreatIntel /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/investigation" element={user ? <Investigation /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/network" element={user ? <NetworkGraph onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/analytics" element={user ? <Analytics onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/compliance" element={user ? <Compliance /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/simulator" element={user ? <Simulator /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/splitscreen" element={user ? <SplitScreen /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/settings" element={user ? <Settings /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/about" element={user ? <AboutUs /> : <LoginPage onLogin={handleLogin} />} />
+                </Routes>
               </AnimatePresence>
             </main>
           </div>
@@ -144,7 +141,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
   );

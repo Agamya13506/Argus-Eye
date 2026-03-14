@@ -113,7 +113,7 @@ async function seedData() {
 // ─── GET ROUTES ───
 app.get('/api/transactions', async (req, res) => {
   try {
-    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/transactions/documents?limit=50`);
+    const response = await appwriteFetch(`/databases/${DATABASE_ID}/collections/transactions/documents?limit=50&orderDesc=\$createdAt`);
     res.json(response.documents || []);
   } catch (error) { res.status(500).json({ error: error.message }); }
 });

@@ -66,6 +66,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const fraudSavedRef = useRef(0);
   const demoTimeoutIds = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [recentBlock, setRecentBlock] = useState<number | null>(null);
+  const subscribedRef = useRef(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -101,12 +102,18 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   }, []);
 
   useEffect(() => {
+    if (subscribedRef.current) return;
+    subscribedRef.current = true;
+    
     let unsubscribe: () => void;
     try {
+      console.log('Setting up Appwrite realtime subscription...');
       unsubscribe = appwriteClient.subscribe(
-        'databases/argus_eye_db/collections/transactions/documents',
+        ['databases.argus_eye_db.collections.transactions.documents'],
         (response: any) => {
-          if (response.events.includes('databases.*.collections.*.documents.*.create')) {
+          console.log('Realtime event received:', response.events);
+          if (response.events.some((e: string) => e.includes('create'))) {
+            console.log('New transaction received:', response.payload);
             setTransactions((prev: any[]) => [response.payload, ...prev].slice(0, 50));
             if (response.payload.status === 'blocked') {
               const amount = response.payload.amount || 0;
@@ -135,6 +142,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   }, []);
 
   const runDemoScenario = (scenario: string) => {
+    console.log('runDemoScenario called with:', scenario);
     const alertId = `alert-${Date.now()}`;
     let newAlert: Alert;
 
@@ -150,6 +158,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         };
         scoreTransaction('velocity', alertId).then(mlRes => {
           const score = mlRes?.score ?? 91;
+          if (!mlRes) {
+            console.warn('Velocity scenario: ML failed, using fallback score 91');
+          }
           api.createTransaction({
             sender: 'sim_user_001',
             receiver: 'sim_merch_crypto',
@@ -165,6 +176,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               priority: score >= 75 ? 'critical' : 'high',
               status: 'open',
               amount: 2500,
+            });
+            api.createThreat({
+              entityId: 'sim_user_001',
+              entityType: 'UPI ID',
+              source: 'SYSTEM',
+              reports: 5,
+              score: Math.round(score),
+              status: score >= 75 ? 'CONFIRMED' : 'REVIEWING',
+              time: 'Just now'
             });
           }
         });
@@ -196,6 +216,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               status: 'open',
               amount: 84000,
             });
+            api.createThreat({
+              entityId: 'user_geo_001',
+              entityType: 'UPI ID',
+              source: 'SYSTEM',
+              reports: 3,
+              score: Math.round(score),
+              status: score >= 75 ? 'CONFIRMED' : 'REVIEWING',
+              time: 'Just now'
+            });
           }
         });
         break;
@@ -226,6 +255,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               status: 'open',
               amount: 84000,
             });
+            api.createThreat({
+              entityId: 'user_sim_99',
+              entityType: 'Phone',
+              source: 'SYSTEM',
+              reports: 2,
+              score: Math.round(score),
+              status: score >= 75 ? 'CONFIRMED' : 'REVIEWING',
+              time: 'Just now'
+            });
           }
         });
         break;
@@ -238,7 +276,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           rbiRef: 'RBI/2017-18/122 (PMLA)',
           timestamp: Date.now()
         };
-        onNavigate?.('network');
+        onNavigate?.('/network');
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('highlightCycle', {
             detail: { nodes: ['user_44', 'user_8', 'user_89'] }
@@ -256,6 +294,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             title: 'Circular Fund Flow — user_44 ring',
             description: `user_44 → user_8 → user_89 → user_44. ₹1,77,000. ML score: ${score.toFixed(1)}.`,
             priority: 'critical', status: 'open', amount: 177000,
+          });
+          api.createThreat({
+            entityId: 'user_44',
+            entityType: 'UPI ID',
+            source: 'SYSTEM',
+            reports: 8,
+            score: Math.round(score),
+            status: 'CONFIRMED',
+            time: 'Just now'
           });
         });
         break;
@@ -286,6 +333,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               status: 'open',
               amount: 50000,
             });
+            api.createThreat({
+              entityId: 'user_social_12',
+              entityType: 'UPI ID',
+              source: 'SYSTEM',
+              reports: 1,
+              score: Math.round(score),
+              status: score >= 75 ? 'CONFIRMED' : 'REVIEWING',
+              time: 'Just now'
+            });
           }
         });
         break;
@@ -300,6 +356,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   const startDemo = () => {
+    console.log('startDemo clicked');
     demoTimeoutIds.current.forEach(id => clearTimeout(id));
     demoTimeoutIds.current = [];
     setDemoMode(true);
@@ -327,18 +384,35 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   const toggleLiveFeed = () => {
-    setLiveFeedActive(prev => !prev);
+    console.log('toggleLiveFeed clicked, current state:', liveFeedActive);
+    setLiveFeedActive(prev => {
+      console.log('Setting liveFeedActive to:', !prev);
+      return !prev;
+    });
   };
 
   useEffect(() => {
-    let interval: any;
+    console.log('[DEBUG] liveFeedActive changed to:', liveFeedActive);
+  }, [liveFeedActive]);
+
+  // Live Feed - creates transactions every 8 seconds
+  const liveFeedActiveRef = useRef(liveFeedActive);
+  liveFeedActiveRef.current = liveFeedActive;
+
+  useEffect(() => {
+    console.log('Live feed useEffect triggered, liveFeedActive:', liveFeedActive);
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (liveFeedActive) {
+      console.log('Starting live feed interval...');
       interval = setInterval(async () => {
+        console.log('Live feed interval running...');
         // Generate random realistic transaction parameters
-        const isFraud = Math.random() > 0.85; // 15% fraud rate for visual noise
+        const isFraud = Math.random() > 0.7; // 30% fraud rate
         const amount = isFraud ? Math.floor(Math.random() * 95000) + 5000 : Math.floor(Math.random() * 5000) + 100;
+        console.log('Generated amount:', amount, 'isFraud:', isFraud);
 
         const mlPayload = {
+          skip_explain: true,
           amount_inr: amount,
           amount_scaled: amount / 10000,
           hour: Math.floor(Math.random() * 24),
@@ -363,8 +437,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         try {
           const txnId = `live_${Date.now()}`;
-          const mlRes = await scoreTransaction('custom', txnId, mlPayload);
-          const score = mlRes?.score ?? Math.floor(Math.random() * 100);
+          let score = Math.floor(Math.random() * 100);
+          try {
+            console.log('Calling ML scoreTransaction...');
+            const mlRes = await scoreTransaction('custom', txnId, mlPayload);
+            console.log('ML result:', mlRes);
+            score = Math.round(mlRes?.score ?? score);
+          } catch (mlErr) {
+            console.warn('ML scoring failed, using fallback:', mlErr);
+          }
 
           let status: 'blocked' | 'flagged' | 'review' | 'clear' = 'clear';
           let type = 'Legitimate';
@@ -372,8 +453,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           if (score > 85) { status = 'blocked'; type = isFraud ? 'Device Risk' : 'High Velocity'; }
           else if (score > 60) { status = 'flagged'; type = 'Suspicious'; }
 
+          console.log('Creating transaction with score:', score, 'status:', status);
           // Fire to Appwrite (which triggers the realtime subscription)
-          api.createTransaction({
+          const result = await api.createTransaction({
             sender: `user_${Math.floor(Math.random() * 9999)}`,
             receiver: `merch_${Math.floor(Math.random() * 999)}`,
             amount,
@@ -381,12 +463,40 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             type,
             status
           });
+            console.log('Transaction created:', result);
+
+            // Force refresh transactions list immediately
+            const freshTx = await api.getTransactions();
+            if (Array.isArray(freshTx) && freshTx.length > 0) {
+              console.log(`[LiveFeed] Refreshed with ${freshTx.length} transactions, first:`, freshTx[0]?.sender);
+              setTransactions(freshTx);
+            }
+
+            // Also create threat if score is high
+            if (score > 60) {
+              await api.createThreat({
+              entityId: `user_${Math.floor(Math.random() * 9999)}`,
+              entityType: 'UPI ID',
+              source: 'SYSTEM',
+              reports: 1,
+              score,
+              status: score > 85 ? 'CONFIRMED' : 'REVIEWING',
+              time: 'Just now'
+            });
+          }
         } catch (e) {
           console.error("Live feed error:", e);
         }
       }, 8000);
+    } else {
+      console.log('Live feed NOT active, not starting interval');
     }
-    return () => { if (interval) clearInterval(interval); };
+    return () => {
+      if (interval) {
+        console.log('Clearing live feed interval');
+        clearInterval(interval);
+      }
+    };
   }, [liveFeedActive]);
 
   const statCards = [
@@ -403,12 +513,27 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     clear: { bg: 'rgba(34,197,94,0.12)', text: '#4ade80' },
   };
 
+  // Force refresh transactions from backend periodically
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const txRes = await api.getTransactions();
+        if (Array.isArray(txRes) && txRes.length > 0) {
+          console.log(`[Polling] Got ${txRes.length} transactions, first:`, txRes[0]?.sender);
+          setTransactions(txRes);
+        }
+      } catch (e) { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.2 }}
       className="p-8 min-h-screen"
+      key="dashboard"
     >
       {/* System Health Bar */}
       <motion.div
@@ -451,6 +576,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <div className="flex items-center gap-2 px-4">
           <div className="w-2 h-2 rounded-full bg-emerald-400 pulse-glow" />
           <span className="text-xs font-bold text-emerald-400">System Active</span>
+          <span className="text-xs ml-4" style={{ color: liveFeedActive ? '#4ade80' : 'var(--muted)' }}>
+            Live Feed: {liveFeedActive ? 'ON' : 'OFF'}
+          </span>
+          <span className="text-xs ml-2" style={{ color: demoMode ? '#fbbf24' : 'var(--muted)' }}>
+            Demo: {demoMode ? 'ON' : 'OFF'}
+          </span>
         </div>
       </motion.div>
 
@@ -652,7 +783,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </motion.div>
 
-      {/* Demo Alerts */}
+      {/* Demo Alerts - Debug: {demoAlerts.length} alerts */}
       {demoAlerts.length > 0 && (
         <div className="fixed bottom-8 right-8 z-50 space-y-3 max-w-sm">
           {demoAlerts.map((alert) => (
@@ -688,9 +819,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
                       onClick={async () => {
+                        console.log('BLOCK clicked for alert:', alert.id);
                         try {
+                          // Create blocked transaction
                           await api.createTransaction({
                             sender: `demo_${alert.type}`,
                             receiver: 'BLOCKED',
@@ -699,15 +832,30 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                             type: alert.title,
                             status: 'blocked',
                           });
-                        } catch (e) { /* silent */ }
+                          // Also create/update a threat
+                          await api.createThreat({
+                            entityId: `demo_${alert.type}`,
+                            entityType: 'UPI ID',
+                            source: 'ANALYST',
+                            reports: 1,
+                            score: 95,
+                            status: 'CONFIRMED',
+                            time: 'Just now'
+                          });
+                          console.log('Block completed successfully');
+                        } catch (e) { 
+                          console.error('Block error:', e); 
+                          alert('Failed to block: ' + e);
+                        }
                         setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
                       }}
                     >
                       Block
                     </button>
                     <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
                       onClick={async () => {
+                        console.log('VERIFY clicked for alert:', alert.id);
                         try {
                           await api.createTransaction({
                             sender: `demo_${alert.type}`,
@@ -717,7 +865,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                             type: alert.title,
                             status: 'clear',
                           });
-                        } catch (e) { /* silent */ }
+                          console.log('Verify completed successfully');
+                        } catch (e) { 
+                          console.error('Verify error:', e);
+                          alert('Failed to verify: ' + e);
+                        }
                         setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
                       }}
                     >
@@ -727,7 +879,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
                       onClick={() => {
                         if (alert.type === 'circular') {
-                          onNavigate?.('network');
+                          onNavigate?.('/network');
                           setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('highlightCycle', {
                               detail: { nodes: ['user_44', 'user_8', 'user_89'] }
@@ -743,11 +895,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           window.dispatchEvent(new CustomEvent('investigationSelect', {
                             detail: { caseType: typeMap[alert.type] || 'Suspicious' }
                           }));
-                          onNavigate?.('investigation');
+                          onNavigate?.('/investigation');
                         }
                       }}
                     >
-                      Escalate →
+                      Investigate →
                     </button>
                   </div>
                 </div>
