@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import CountUp from 'react-countup';
 import { ShieldOff, Shield } from 'lucide-react';
 import api, { appwriteClient } from '../services/api';
+import { scoreTransaction } from '../services/mlApi';
 
 const generateMockTx = () => {
   const isFraud = Math.random() < 0.15; // 15% true fraud
@@ -39,22 +40,63 @@ export default function SplitScreen() {
     const initial = Array.from({ length: 6 }).map(() => generateMockTx());
     setTransactions(initial);
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       const tx = generateMockTx();
-      setTransactions(prev => [tx, ...prev].slice(0, 30));
 
-      // Update stats
+      // Build ML payload from the generated transaction
+      const mlPayload = {
+        skip_explain: true,
+        amount_inr: tx.amount,
+        amount_scaled: tx.amount / 10000,
+        hour: new Date().getHours(),
+        velocity_60s: tx.isFraud ? Math.floor(Math.random() * 12) + 3 : Math.random() < 0.3 ? 2 : 0,
+        is_new_device: tx.isFraud && Math.random() > 0.6 ? 1 : 0,
+        is_new_recipient: tx.isFraud ? 1 : 0,
+        account_age_days: tx.isFraud ? Math.floor(Math.random() * 30) + 1 : 400,
+        city_risk_score: tx.isFraud ? 0.75 : 0.2,
+        is_festival_day: 0,
+        is_sim_swap_signal: 0,
+        is_round_amount: tx.amount % 1000 === 0 ? 1 : 0,
+        cat_crypto: 0, cat_grocery: 0, cat_electronics: 0, cat_travel: 0,
+        V14: tx.isFraud ? -20 : 1,
+        V4:  tx.isFraud ?   6 : -1,
+        V12: tx.isFraud ? -15 : 1,
+        V10: tx.isFraud ? -12 : 1,
+        V11: tx.isFraud ?  -6 : 0.5,
+      };
+
+      let finalScore = tx.argusScore;
+      try {
+        const mlRes = await scoreTransaction('custom', `split_${Date.now()}`, mlPayload);
+        if (mlRes?.score != null) finalScore = Math.round(mlRes.score);
+      } catch { /* use generated score */ }
+
+      const txWithMlScore = { ...tx, argusScore: finalScore };
+      setTransactions(prev => [txWithMlScore, ...prev].slice(0, 30));
+
+      // Write to Appwrite so it appears in the main live feed
+      const status = finalScore >= 75 ? 'blocked' : finalScore >= 40 ? 'flagged' : 'clear';
+      api.createTransaction({
+        sender: tx.sender,
+        receiver: tx.receiver,
+        amount: tx.amount,
+        score: finalScore,
+        type: tx.type,
+        status,
+      }).catch(() => {});
+
+      // Update stats using ML score
       if (tx.isFraud) {
         if (tx.legacyBlocked) setLegacyStats(s => ({ ...s, prevented: s.prevented + tx.amount }));
         else setLegacyStats(s => ({ ...s, missed: s.missed + tx.amount }));
 
-        if (tx.argusScore >= 75) setArgusStats(s => ({ ...s, prevented: s.prevented + tx.amount }));
+        if (finalScore >= 75) setArgusStats(s => ({ ...s, prevented: s.prevented + tx.amount }));
         else setArgusStats(s => ({ ...s, missed: s.missed + tx.amount }));
       } else {
         if (tx.legacyBlocked) setLegacyStats(s => ({ ...s, fp: s.fp + 1 }));
-        if (tx.argusScore >= 75) setArgusStats(s => ({ ...s, fp: s.fp + 1 }));
+        if (finalScore >= 75) setArgusStats(s => ({ ...s, fp: s.fp + 1 }));
       }
-    }, 2500);
+    }, 4000);
     return () => clearInterval(interval);
   }, []);
 

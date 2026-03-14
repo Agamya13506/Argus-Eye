@@ -178,6 +178,21 @@ export const api = {
       return [];
     }
   },
+
+  async createAuditLog(data) {
+    try {
+      const res = await fetch(`${API_BASE}/audit-logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.error('createAuditLog error:', e);
+      return null;
+    }
+  },
 };
 
 export default api;

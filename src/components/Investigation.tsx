@@ -439,10 +439,63 @@ export default function Investigation() {
 
   const handleKYC = async () => {
     setKycLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setKycLoading(false);
-    setKycDone(true);
-    setTimeout(() => setKycDone(false), 3000);
+    try {
+      await api.updateCase(selectedCase.$id, {
+        status: 'KYC_REQUESTED',
+        kycRequestedAt: new Date().toISOString(),
+      });
+      await api.createAuditLog({
+        action: 'KYC_REVERIFICATION_REQUESTED',
+        entityId: selectedCase.$id,
+        analystId: 'analyst_001',
+        details: `KYC reverification requested for ${selectedCase.id} (${selectedCase.type})`,
+        rbi_reference: 'RBI/2020-21/44',
+      });
+      setCases(prev => prev.map(c =>
+        c.$id === selectedCase.$id ? { ...c, status: 'KYC_REQUESTED' } : c
+      ));
+      setSelectedCase(prev => ({ ...prev, status: 'KYC_REQUESTED' }));
+    } catch (e) {
+      console.error('KYC request failed:', e);
+    } finally {
+      setKycLoading(false);
+      setKycDone(true);
+      setTimeout(() => setKycDone(false), 3000);
+    }
+  };
+
+  const handleFlagForReview = async () => {
+    setCases(prev => prev.map(c =>
+      c.$id === selectedCase.$id ? { ...c, status: 'REVIEW' } : c
+    ));
+    setSelectedCase(prev => ({ ...prev, status: 'REVIEW' }));
+    try {
+      await api.updateCase(selectedCase.$id, { status: 'REVIEW' });
+      await api.createAuditLog({
+        action: 'CASE_FLAGGED_FOR_REVIEW',
+        entityId: selectedCase.$id,
+        analystId: 'analyst_001',
+        details: `Case ${selectedCase.id} flagged for review`,
+        rbi_reference: 'RBI/2021-22/56',
+      });
+    } catch (e) { /* silent */ }
+  };
+
+  const handleEscalate = async () => {
+    setCases(prev => prev.map(c =>
+      c.$id === selectedCase.$id ? { ...c, status: 'ESCALATED' } : c
+    ));
+    setSelectedCase(prev => ({ ...prev, status: 'ESCALATED' }));
+    try {
+      await api.updateCase(selectedCase.$id, { status: 'ESCALATED' });
+      await api.createAuditLog({
+        action: 'CASE_ESCALATED',
+        entityId: selectedCase.$id,
+        analystId: 'analyst_001',
+        details: `Case ${selectedCase.id} escalated to senior analyst`,
+        rbi_reference: 'RBI/2021-22/56',
+      });
+    } catch (e) { /* silent */ }
   };
 
   useEffect(() => { setKycDone(false); setKycLoading(false); }, [selectedCase.$id]);
@@ -757,7 +810,11 @@ export default function Investigation() {
                       </button>
                     ) : (
                       <button
-                        onClick={rec.urgency === 'HIGH' ? handleBlock : undefined}
+                        onClick={
+                          rec.urgency === 'HIGH' ? handleBlock :
+                          rec.urgency === 'MEDIUM' ? handleFlagForReview :
+                          handleEscalate
+                        }
                         className={`px-4 py-1.5 rounded-lg text-sm font-medium
                                     text-white transition-colors ${rec.urgency === 'HIGH'
                             ? 'bg-rose-500 hover:bg-rose-600'

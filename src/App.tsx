@@ -86,7 +86,7 @@ function AppContent() {
                   <Route path="/network" element={user ? <NetworkGraph onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
                   <Route path="/analytics" element={user ? <Analytics onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
                   <Route path="/compliance" element={user ? <Compliance /> : <LoginPage onLogin={handleLogin} />} />
-                  <Route path="/simulator" element={user ? <Simulator /> : <LoginPage onLogin={handleLogin} />} />
+                  <Route path="/simulator" element={user ? <Simulator onNavigate={(n) => navigate(`/${n}`)} /> : <LoginPage onLogin={handleLogin} />} />
                   <Route path="/splitscreen" element={user ? <SplitScreen /> : <LoginPage onLogin={handleLogin} />} />
                   <Route path="/settings" element={user ? <Settings /> : <LoginPage onLogin={handleLogin} />} />
                   <Route path="/about" element={user ? <AboutUs /> : <LoginPage onLogin={handleLogin} />} />

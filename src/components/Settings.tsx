@@ -38,9 +38,18 @@ export default function Settings() {
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>(mockAuditLogs);
     const [auditLoading, setAuditLoading] = useState(false);
     const [users, setUsers] = useState(mockUsers);
-    const [alertThreshold, setAlertThreshold] = useState(75);
-    const [emailNotifications, setEmailNotifications] = useState(true);
-    const [slackNotifications, setSlackNotifications] = useState(false);
+    const [alertThreshold, setAlertThreshold] = useState<number>(() => {
+        const saved = localStorage.getItem('argus_alert_threshold');
+        return saved ? Number(saved) : 75;
+    });
+    const [emailNotifications, setEmailNotifications] = useState<boolean>(() => {
+        const saved = localStorage.getItem('argus_email_notifications');
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [slackNotifications, setSlackNotifications] = useState<boolean>(() => {
+        const saved = localStorage.getItem('argus_slack_notifications');
+        return saved !== null ? saved === 'true' : false;
+    });
     const [auditRefreshing, setAuditRefreshing] = useState(false);
     const [autoBlock, setAutoBlock] = useState(true);
 
@@ -75,22 +84,61 @@ export default function Settings() {
         { id: 'notifications', label: 'Notifications', icon: Bell },
     ];
 
-    const toggleUserStatus = (userId: number) => {
+    const toggleUserStatus = async (userId: number) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+        const newStatus = user.status === 'active' ? 'inactive' : 'active';
         setUsers(prev => prev.map(u =>
-            u.id === userId ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u
+            u.id === userId ? { ...u, status: newStatus } : u
         ));
+        try {
+          await api.createAuditLog({
+            action: `USER_${newStatus.toUpperCase()}`,
+            entityId: user.email,
+            analystId: 'admin',
+            details: `User ${user.name} (${user.email}) set to ${newStatus}`,
+            rbi_reference: '',
+          });
+        } catch (e) { /* silent */ }
     };
 
-    const changeUserRole = (userId: number, newRole: UserRole) => {
+    const changeUserRole = async (userId: number, newRole: UserRole) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
         setUsers(prev => prev.map(u =>
             u.id === userId ? { ...u, role: newRole } : u
         ));
+        try {
+          await api.createAuditLog({
+            action: 'USER_ROLE_CHANGED',
+            entityId: user.email,
+            analystId: 'admin',
+            details: `User ${user.name} role changed to ${newRole}`,
+            rbi_reference: '',
+          });
+        } catch (e) { /* silent */ }
     };
 
     const handleRefreshAudit = async () => {
         setAuditRefreshing(true);
-        await new Promise(r => setTimeout(r, 900));
-        setAuditRefreshing(false);
+        try {
+          const data = await api.getAuditLogs();
+          if (Array.isArray(data) && data.length > 0) {
+            setAuditLogs(data.map((log: any) => ({
+              id: log.$id || log.id || `LOG-${Math.random()}`,
+              action: log.action || 'System Action',
+              user: log.analystId || log.user || 'System',
+              timestamp: log.timestamp
+                ? new Date(log.timestamp).toLocaleString('en-IN')
+                : 'Unknown',
+              details: log.details || `${log.action} on ${log.entityId}`,
+            })));
+          }
+        } catch (e) {
+          console.error('Audit refresh failed:', e);
+        } finally {
+          setAuditRefreshing(false);
+        }
     };
 
     return (
@@ -351,7 +399,11 @@ export default function Settings() {
                                         <p className="text-xs" style={{ color: 'var(--muted)' }}>Receive fraud alerts via email</p>
                                     </div>
                                     <button
-                                        onClick={() => setEmailNotifications(!emailNotifications)}
+                                        onClick={() => {
+                                          const next = !emailNotifications;
+                                          setEmailNotifications(next);
+                                          localStorage.setItem('argus_email_notifications', String(next));
+                                        }}
                                         className={`w-12 h-6 rounded-full relative transition-colors ${emailNotifications ? 'bg-rose-500' : 'bg-slate-500'}`}
                                     >
                                         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${emailNotifications ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -363,7 +415,11 @@ export default function Settings() {
                                         <p className="text-xs" style={{ color: 'var(--muted)' }}>Post alerts to #fraud-alerts channel</p>
                                     </div>
                                     <button
-                                        onClick={() => setSlackNotifications(!slackNotifications)}
+                                        onClick={() => {
+                                          const next = !slackNotifications;
+                                          setSlackNotifications(next);
+                                          localStorage.setItem('argus_slack_notifications', String(next));
+                                        }}
                                         className={`w-12 h-6 rounded-full relative transition-colors ${slackNotifications ? 'bg-rose-500' : 'bg-slate-500'}`}
                                     >
                                         <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${slackNotifications ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -382,7 +438,11 @@ export default function Settings() {
                                         min="0"
                                         max="100"
                                         value={alertThreshold}
-                                        onChange={(e) => setAlertThreshold(Number(e.target.value))}
+                                        onChange={(e) => {
+                                          const v = Number(e.target.value);
+                                          setAlertThreshold(v);
+                                          localStorage.setItem('argus_alert_threshold', String(v));
+                                        }}
                                         className="w-full h-2 rounded-full appearance-none cursor-pointer"
                                         style={{ background: `linear-gradient(to right, #f43f5e 0%, #f43f5e ${alertThreshold}%, var(--border) ${alertThreshold}%, var(--border) 100%)` }}
                                     />

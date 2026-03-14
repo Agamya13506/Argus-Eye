@@ -301,7 +301,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           caseTitle: 'Circular Fund Flow — user_44 ring',
           fraudType: 'Money Mule'
         };
-        onNavigate?.('/network');
+        onNavigate?.('network');
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('highlightCycle', {
             detail: { nodes: ['user_44', 'user_8', 'user_89'] }
@@ -722,7 +722,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     <span>Blocked:</span><span style={{ color: 'var(--text)' }}>{(stats.fraudDetected + (fraudSaved > 0 ? fraudSaved / 2500 : 0)).toLocaleString('en-IN')} txns</span>
                   </div>
                   <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-                    <span>Detection Rate:</span><span className="text-emerald-400">99.98%</span>
+                    <span>Detection Rate:</span>
+                    <span className="text-emerald-400">
+                      {stats.totalTransactions > 0
+                        ? `${((stats.fraudDetected / stats.totalTransactions) * 100).toFixed(2)}%`
+                        : '—'}
+                    </span>
                   </div>
                   <div className="flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
                     <span>Avg Prevented:</span><span style={{ color: 'var(--text)' }}>₹{Math.round(stat.value / (stats.fraudDetected || 1)).toLocaleString('en-IN')}</span>

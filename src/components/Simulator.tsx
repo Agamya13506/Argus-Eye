@@ -150,20 +150,11 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
       }).catch(() => { });
     }
 
-    const vectorStats: Record<string, { detection: number; block: number }> = {
-      card_testing: { detection: 0.94, block: 0.97 },
-      velocity: { detection: 0.96, block: 0.98 },
-      account_takeover: { detection: 0.91, block: 0.95 },
-      geo_imposter: { detection: 0.93, block: 0.96 },
-      mule: { detection: 0.88, block: 0.92 },
-      phishing: { detection: 0.89, block: 0.93 },
-      uco_bank: { detection: 0.97, block: 0.99 },
-    };
-    const stats = vectorStats[selectedVector] || { detection: 0.90, block: 0.94 };
-    const total = 800 + Math.floor(selectedVector.length * 47);
-    const detected = Math.floor(total * stats.detection);
-    const blocked = Math.floor(detected * stats.block);
-    const falsePos = Math.floor(total * 0.012);
+    // Derive stats from actual ML log results — no hardcoding
+    const total = logs.length;
+    const detected = logs.filter(l => l.status !== 'PASSED').length;
+    const blocked = logs.filter(l => l.status === 'BLOCKED').length;
+    const falsePos = 0; // True false positives require ground truth — honest zero
     const vectorName = attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
     setResults([{ vector: vectorName, total, detected, blocked, falsePos }]);
     setIsRunning(false);
