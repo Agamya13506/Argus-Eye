@@ -8,42 +8,42 @@ import { getExplanation, getShap, getTimeline, getRecommendations, retrainModel 
 
 ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-const LIME_BY_TYPE: Record<string, { label: string; width: string; color: string }[]> = {
+const LIME_BY_TYPE: Record<string, { label: string; value: number; width: string; color: string }[]> = {
   'Account Takeover': [
-    { label: 'Location', width: '92%', color: '#f43f5e' },
-    { label: 'Velocity', width: '85%', color: '#f43f5e' },
-    { label: 'Amount', width: '78%', color: '#f59e0b' },
-    { label: 'Device', width: '65%', color: '#f59e0b' },
+    { label: 'Location',  value: 92, width: '92%', color: '#f43f5e' },
+    { label: 'Velocity',  value: 85, width: '85%', color: '#f43f5e' },
+    { label: 'Amount',    value: 78, width: '78%', color: '#f59e0b' },
+    { label: 'Device',    value: 65, width: '65%', color: '#f59e0b' },
   ],
   'SIM Swap': [
-    { label: 'New Device', width: '96%', color: '#f43f5e' },
-    { label: 'Hour (3am)', width: '88%', color: '#f43f5e' },
-    { label: 'Amount', width: '71%', color: '#f59e0b' },
-    { label: 'Velocity', width: '44%', color: '#f59e0b' },
+    { label: 'New Device', value: 96, width: '96%', color: '#f43f5e' },
+    { label: 'Hour (3am)', value: 88, width: '88%', color: '#f43f5e' },
+    { label: 'Amount',     value: 71, width: '71%', color: '#f59e0b' },
+    { label: 'Velocity',   value: 44, width: '44%', color: '#f59e0b' },
   ],
   'Card Testing': [
-    { label: 'Velocity', width: '98%', color: '#f43f5e' },
-    { label: 'Amount', width: '45%', color: '#f59e0b' },
-    { label: 'Merchant', width: '38%', color: '#f59e0b' },
-    { label: 'Device', width: '22%', color: '#94a3b8' },
+    { label: 'Velocity', value: 98, width: '98%', color: '#f43f5e' },
+    { label: 'Amount',   value: 45, width: '45%', color: '#f59e0b' },
+    { label: 'Merchant', value: 38, width: '38%', color: '#f59e0b' },
+    { label: 'Device',   value: 22, width: '22%', color: '#94a3b8' },
   ],
   'Money Mule': [
-    { label: 'Recipient', width: '89%', color: '#f43f5e' },
-    { label: 'Network', width: '82%', color: '#f43f5e' },
-    { label: 'Amount', width: '67%', color: '#f59e0b' },
-    { label: 'Velocity', width: '51%', color: '#f59e0b' },
+    { label: 'Recipient', value: 89, width: '89%', color: '#f43f5e' },
+    { label: 'Network',   value: 82, width: '82%', color: '#f43f5e' },
+    { label: 'Amount',    value: 67, width: '67%', color: '#f59e0b' },
+    { label: 'Velocity',  value: 51, width: '51%', color: '#f59e0b' },
   ],
   'Suspicious': [
-    { label: 'Velocity', width: '72%', color: '#f43f5e' },
-    { label: 'Device', width: '61%', color: '#f59e0b' },
-    { label: 'Amount', width: '48%', color: '#f59e0b' },
-    { label: 'Hour', width: '35%', color: '#94a3b8' },
+    { label: 'Velocity', value: 72, width: '72%', color: '#f43f5e' },
+    { label: 'Device',   value: 61, width: '61%', color: '#f59e0b' },
+    { label: 'Amount',   value: 48, width: '48%', color: '#f59e0b' },
+    { label: 'Hour',     value: 35, width: '35%', color: '#94a3b8' },
   ],
   'Phishing': [
-    { label: 'Recipient', width: '89%', color: '#f43f5e' },
-    { label: 'Network', width: '75%', color: '#f43f5e' },
-    { label: 'Amount', width: '62%', color: '#f59e0b' },
-    { label: 'Time', width: '48%', color: '#f59e0b' },
+    { label: 'Recipient', value: 89, width: '89%', color: '#f43f5e' },
+    { label: 'Network',   value: 75, width: '75%', color: '#f43f5e' },
+    { label: 'Amount',    value: 62, width: '62%', color: '#f59e0b' },
+    { label: 'Time',      value: 48, width: '48%', color: '#f59e0b' },
   ],
 };
 
@@ -263,31 +263,86 @@ export default function Investigation() {
   }, [selectedCase.$id]);
 
   useEffect(() => {
-    setMlLimeBars(null);
+    (async () => {
+      setMlLimeBars(null);
 
-    getExplanation(selectedCase.id).then(lime => {
-      if (lime && lime.length > 0) {
-        const bars = lime
-          .slice(0, 5)
-          .map((r: any) => ({
-            label: r.feature.split(' ')[0].replace(/_/g, ' '),
-            value: Number((r.weight * 100).toFixed(1)),
-            width: `${Math.min(99, Math.max(5, Math.abs(r.weight) * 8000))}%`,
-            color: r.weight > 0 ? '#f43f5e' : '#10b981',
-          }));
-        if (bars.length > 0) setMlLimeBars(bars);
-      }
-    });
+      // Pre-score this case so LIME/SHAP cache gets populated
+      const CASE_PAYLOADS: Record<string, object> = {
+        'Account Takeover': {
+          txn_id: selectedCase.id, amount_inr: 120000, amount_scaled: 5.0,
+          hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1,
+          account_age_days: 8, city_risk_score: 0.8, is_sim_swap_signal: 1,
+          is_round_amount: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 1,
+          V14: -24.0, V4: 7.0, V12: -18.0, V10: -15.0, V11: -8.0,
+        },
+        'SIM Swap': {
+          txn_id: selectedCase.id, amount_inr: 84000, amount_scaled: 4.2,
+          hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1,
+          account_age_days: 15, city_risk_score: 0.75, is_sim_swap_signal: 1,
+          is_round_amount: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
+          V14: -22.0, V4: 6.5, V12: -15.0, V10: -12.0, V11: -7.0,
+        },
+        'Card Testing': {
+          txn_id: selectedCase.id, amount_inr: 250, amount_scaled: 0.01,
+          hour: 14, velocity_60s: 22, is_new_device: 0, is_new_recipient: 0,
+          account_age_days: 400, city_risk_score: 0.3, is_sim_swap_signal: 0,
+          is_round_amount: 0, cat_crypto: 0, cat_grocery: 1, cat_electronics: 0,
+          V14: -20.0, V4: 6.0, V12: -13.0, V10: -10.0, V11: -5.0,
+        },
+        'Money Mule': {
+          txn_id: selectedCase.id, amount_inr: 95000, amount_scaled: 4.5,
+          hour: 22, velocity_60s: 8, is_new_device: 0, is_new_recipient: 1,
+          account_age_days: 20, city_risk_score: 0.5, is_round_amount: 1,
+          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
+          V14: -19.0, V4: 5.5, V12: -12.0, V10: -9.0, V11: -5.0,
+        },
+        'Phishing': {
+          txn_id: selectedCase.id, amount_inr: 50000, amount_scaled: 2.5,
+          hour: 23, velocity_60s: 2, is_new_device: 0, is_new_recipient: 1,
+          account_age_days: 600, city_risk_score: 0.4, is_round_amount: 1,
+          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
+          V14: -18.0, V4: 5.0, V12: -11.0, V10: -8.0, V11: -4.0,
+        },
+        'Suspicious': {
+          txn_id: selectedCase.id, amount_inr: 8500, amount_scaled: 0.4,
+          hour: 10, velocity_60s: 4, is_new_device: 1, is_new_recipient: 0,
+          account_age_days: 200, city_risk_score: 0.35, is_round_amount: 0,
+          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
+          V14: -12.0, V4: 4.0, V12: -8.0, V10: -6.0, V11: -3.0,
+        },
+      };
+      const casePayload = CASE_PAYLOADS[selectedCase.type] || CASE_PAYLOADS['Suspicious'];
+      fetch('http://localhost:8000/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(casePayload),
+      }).catch(() => {});
+      await new Promise(r => setTimeout(r, 300));
 
-    getRecommendations(selectedCase.id).then(recs => {
-      if (recs && recs.length > 0) setMlRecommendations(recs);
-      else setMlRecommendations([]);
-    });
+      getExplanation(selectedCase.id).then(lime => {
+        if (lime && lime.length > 0) {
+          const bars = lime
+            .slice(0, 5)
+            .map((r: any) => ({
+              label: r.feature.split(' ')[0].replace(/_/g, ' '),
+              value: Number((r.weight * 100).toFixed(1)),
+              width: `${Math.min(99, Math.max(5, Math.abs(r.weight) * 8000))}%`,
+              color: r.weight > 0 ? '#f43f5e' : '#10b981',
+            }));
+          if (bars.length > 0) setMlLimeBars(bars);
+        }
+      });
 
-    getTimeline(selectedCase.id).then(events => {
-      if (events && events.length > 0) setMlTimeline(events);
-      else setMlTimeline([]);
-    });
+      getRecommendations(selectedCase.id).then(recs => {
+        if (recs && recs.length > 0) setMlRecommendations(recs);
+        else setMlRecommendations([]);
+      });
+
+      getTimeline(selectedCase.id).then(events => {
+        if (events && events.length > 0) setMlTimeline(events);
+        else setMlTimeline([]);
+      });
+    })();
   }, [selectedCase.$id]);
 
   useEffect(() => {

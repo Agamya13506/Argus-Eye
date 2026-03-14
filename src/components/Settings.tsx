@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Users, Shield, Bell, Database, Globe, Server, Activity, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Settings as SettingsIcon, Users, Shield, Bell, Database, Globe, Server, Activity, CheckCircle, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { useAuth, UserRole } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
@@ -35,7 +35,8 @@ export default function Settings() {
     const { theme, toggleTheme } = useTheme();
     const [activeSection, setActiveSection] = useState('users');
     const [apiHealth, setApiHealth] = useState<any>(null);
-    const [auditLogs] = useState(mockAuditLogs);
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>(mockAuditLogs);
+    const [auditLoading, setAuditLoading] = useState(false);
     const [users, setUsers] = useState(mockUsers);
     const [alertThreshold, setAlertThreshold] = useState(75);
     const [emailNotifications, setEmailNotifications] = useState(true);
@@ -50,6 +51,22 @@ export default function Settings() {
         }
         checkHealth();
     }, []);
+
+    useEffect(() => {
+        if (activeSection !== 'audit') return;
+        setAuditLoading(true);
+        api.getAuditLogs().then((data: any[]) => {
+            if (Array.isArray(data) && data.length > 0) {
+                setAuditLogs(data.map((log: any) => ({
+                    id:        log.$id || log.id || `LOG-${Math.random()}`,
+                    action:    log.action || 'System Action',
+                    user:      log.analystId || log.user || 'System',
+                    timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN') : 'Unknown',
+                    details:   log.details || (log.entityId ? `${log.action} on ${log.entityId}` : 'No details'),
+                })));
+            }
+        }).finally(() => setAuditLoading(false));
+    }, [activeSection]);
 
     const sections = [
         { id: 'users', label: 'User Management', icon: Users },
@@ -291,7 +308,12 @@ export default function Settings() {
                                 </button>
                             </div>
                             <div className="space-y-3">
-                                {auditLogs.map((log, i) => (
+                                {auditLoading ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="w-6 h-6 text-rose-400 animate-spin" />
+                                        <span className="ml-2 text-sm" style={{ color: 'var(--muted)' }}>Loading audit logs...</span>
+                                    </div>
+                                ) : auditLogs.map((log, i) => (
                                     <motion.div
                                         key={log.id}
                                         initial={{ opacity: 0, y: 10 }}
@@ -312,6 +334,7 @@ export default function Settings() {
                                         </div>
                                     </motion.div>
                                 ))}
+                                )}
                             </div>
                         </div>
                     )}

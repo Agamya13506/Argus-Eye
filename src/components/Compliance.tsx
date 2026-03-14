@@ -192,6 +192,35 @@ export default function Compliance() {
         </div>
       </header>
 
+      {/* RBI & SEBI Compliance Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="glass-card p-5 rounded-2xl mb-8 border-l-4 border-emerald-400"
+        style={{ background: 'rgba(16,185,129,0.04)' }}
+      >
+        <div className="flex items-start gap-4">
+          <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-bold text-emerald-400 mb-2">
+              RBI &amp; SEBI Compliant Platform
+            </h3>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              Argus Eye is built to meet the regulatory obligations of the Reserve Bank of India
+              and the Securities and Exchange Board of India. Our fraud detection pipeline aligns
+              with RBI's Master Directions on Fraud Risk Management (RBI/2024-25/46), mandatory
+              Suspicious Transaction Report and Cash Transaction Report filing to FIU-IND under
+              the Prevention of Money Laundering Act, RBI's circular on cyber security framework
+              for payment systems, and SEBI's cybersecurity and cyber resilience framework for
+              regulated entities (SEBI/HO/ITD/ITD_VAPT/P/CIR/2023/135). Every blocked transaction
+              carries an RBI circular reference. All audit trails are immutable and exportable
+              for regulatory inspection.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 stagger-children">
         <motion.div whileHover={{ y: -3 }} className="glass-card p-6 rounded-2xl border-l-4 border-emerald-400">

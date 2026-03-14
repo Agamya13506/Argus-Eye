@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import CountUp from 'react-countup';
 import {
   Activity, AlertTriangle, Shield, TrendingUp, TrendingDown,
@@ -63,6 +63,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [demoAlerts, setDemoAlerts] = useState<Alert[]>([]);
   const [liveFeedActive, setLiveFeedActive] = useState(false);
   const [fraudSaved, setFraudSaved] = useState(0);
+  const fraudSavedRef = useRef(0);
+  const demoTimeoutIds = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [recentBlock, setRecentBlock] = useState<number | null>(null);
 
   useEffect(() => {
@@ -114,6 +116,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 fraudPrevented: prev.fraudPrevented + amount
               }));
               setFraudSaved(prev => prev + amount);
+              fraudSavedRef.current += amount;
               setRecentBlock(amount);
               setTimeout(() => setRecentBlock(null), 2000);
             }
@@ -145,23 +148,25 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           rbiRef: 'RBI/2021-22/56',
           timestamp: Date.now()
         };
-        scoreTransaction('velocity', alertId, {
-          amount_inr: 2500,
-          type: 'UPI P2P',
-          time_of_day: 14,
-          velocity_1h: 23, // high velocity
-          age_of_account_days: 2,
-          distance_from_home_km: 10,
-          is_new_device: 0
-        }).then(mlRes => {
+        scoreTransaction('velocity', alertId).then(mlRes => {
+          const score = mlRes?.score ?? 91;
           api.createTransaction({
             sender: 'sim_user_001',
             receiver: 'sim_merch_crypto',
             amount: 2500,
-            score: mlRes.risk_score || 91,
-            type: 'Card Testing',
-            status: 'blocked'
+            score: Math.round(score),
+            type: mlRes?.fraud_type?.replace(/_/g, ' ') || 'Card Testing',
+            status: score >= 75 ? 'blocked' : 'flagged'
           });
+          if (score >= 40) {
+            api.createCase({
+              title: 'Velocity Attack — sim_user_001',
+              description: `23 micro-transactions in 58 seconds. ML score: ${score.toFixed(1)}. Auto-blocked.`,
+              priority: score >= 75 ? 'critical' : 'high',
+              status: 'open',
+              amount: 2500,
+            });
+          }
         });
         break;
       case 'geo':
@@ -173,23 +178,25 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           rbiRef: 'RBI/2020-21/112',
           timestamp: Date.now()
         };
-        scoreTransaction('geo_imposter', alertId, {
-          amount_inr: 84000,
-          type: 'UPI P2M',
-          time_of_day: 3,
-          velocity_1h: 1,
-          age_of_account_days: 100,
-          distance_from_home_km: 1156, // impossible geo
-          is_new_device: 1
-        }).then(mlRes => {
+        scoreTransaction('geo_imposter', alertId).then(mlRes => {
+          const score = mlRes?.score ?? 95;
           api.createTransaction({
             sender: 'user_geo_001',
             receiver: 'merch_delhi_44',
             amount: 84000,
-            score: mlRes.risk_score || 95,
-            type: 'Account Takeover',
-            status: 'flagged'
+            score: Math.round(score),
+            type: mlRes?.fraud_type?.replace(/_/g, ' ') || 'Account Takeover',
+            status: score >= 75 ? 'blocked' : 'flagged'
           });
+          if (score >= 40) {
+            api.createCase({
+              title: 'Geographic Impossibility — user_geo_001',
+              description: `Mumbai → Delhi in 8 min (8,670 km/h). ML score: ${score.toFixed(1)}.`,
+              priority: score >= 75 ? 'critical' : 'high',
+              status: 'open',
+              amount: 84000,
+            });
+          }
         });
         break;
       case 'sim':
@@ -201,23 +208,25 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           rbiRef: 'RBI/2018-19/215',
           timestamp: Date.now()
         };
-        scoreTransaction('sim_swap', alertId, {
-          amount_inr: 84000,
-          type: 'UPI P2P',
-          time_of_day: 3,
-          velocity_1h: 1,
-          age_of_account_days: 100,
-          distance_from_home_km: 5,
-          is_new_device: 1 // SIM Swap proxy
-        }).then(mlRes => {
+        scoreTransaction('account_takeover', alertId).then(mlRes => {
+          const score = mlRes?.score ?? 88;
           api.createTransaction({
             sender: 'user_sim_99',
             receiver: 'merch_finance_7',
             amount: 84000,
-            score: mlRes.risk_score || 88,
-            type: 'SIM Swap',
-            status: 'flagged'
+            score: Math.round(score),
+            type: mlRes?.fraud_type?.replace(/_/g, ' ') || 'SIM Swap',
+            status: score >= 75 ? 'blocked' : 'flagged'
           });
+          if (score >= 40) {
+            api.createCase({
+              title: 'SIM Swap — user_sim_99',
+              description: `New device detected. ₹84,000 at 3:14am. ML score: ${score.toFixed(1)}.`,
+              priority: score >= 75 ? 'critical' : 'high',
+              status: 'open',
+              amount: 84000,
+            });
+          }
         });
         break;
       case 'circular':
@@ -235,6 +244,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             detail: { nodes: ['user_44', 'user_8', 'user_89'] }
           }));
         }, 600);
+        scoreTransaction('mule', alertId).then(mlRes => {
+          const score = mlRes?.score ?? 82;
+          api.createTransaction({
+            sender: 'user_44', receiver: 'user_8',
+            amount: 177000, score: Math.round(score),
+            type: mlRes?.fraud_type?.replace(/_/g, ' ') || 'Money Mule',
+            status: score >= 75 ? 'blocked' : 'flagged'
+          });
+          api.createCase({
+            title: 'Circular Fund Flow — user_44 ring',
+            description: `user_44 → user_8 → user_89 → user_44. ₹1,77,000. ML score: ${score.toFixed(1)}.`,
+            priority: 'critical', status: 'open', amount: 177000,
+          });
+        });
         break;
       case 'social':
         newAlert = {
@@ -245,23 +268,25 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           rbiRef: 'RBI/2022-23/89',
           timestamp: Date.now()
         };
-        scoreTransaction('phishing', alertId, {
-          amount_inr: 50000,
-          type: 'UPI P2P',
-          time_of_day: 23,
-          velocity_1h: 1,
-          age_of_account_days: 2,
-          distance_from_home_km: 50,
-          is_new_device: 0
-        }).then(mlRes => {
+        scoreTransaction('phishing', alertId).then(mlRes => {
+          const score = mlRes?.score ?? 76;
           api.createTransaction({
             sender: 'user_social_12',
             receiver: 'new_recipient_888',
             amount: 50000,
-            score: mlRes.risk_score || 76,
-            type: 'Phishing',
-            status: 'flagged'
+            score: Math.round(score),
+            type: mlRes?.fraud_type?.replace(/_/g, ' ') || 'Phishing',
+            status: score >= 75 ? 'blocked' : 'flagged'
           });
+          if (score >= 40) {
+            api.createCase({
+              title: 'Social Engineering — user_social_12',
+              description: `Round amount, new recipient, 11pm. ML score: ${score.toFixed(1)}.`,
+              priority: score >= 75 ? 'critical' : 'high',
+              status: 'open',
+              amount: 50000,
+            });
+          }
         });
         break;
       default:
@@ -275,17 +300,30 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   const startDemo = () => {
+    demoTimeoutIds.current.forEach(id => clearTimeout(id));
+    demoTimeoutIds.current = [];
     setDemoMode(true);
     setDemoAlerts([]);
+    const ids = [
+      setTimeout(() => runDemoScenario('velocity'),  5000),
+      setTimeout(() => runDemoScenario('geo'),       15000),
+      setTimeout(() => runDemoScenario('sim'),       28000),
+      setTimeout(() => runDemoScenario('circular'),  45000),
+      setTimeout(() => runDemoScenario('social'),    60000),
+      setTimeout(() => {
+        setDemoMode(false);
+        demoTimeoutIds.current = [];
+      }, 68000),
+    ];
+    demoTimeoutIds.current = ids;
+  };
 
-    setTimeout(() => runDemoScenario('velocity'), 5000);
-    setTimeout(() => runDemoScenario('geo'), 15000);
-    setTimeout(() => runDemoScenario('sim'), 28000);
-    setTimeout(() => runDemoScenario('circular'), 45000);
-    setTimeout(() => {
-      runDemoScenario('social');
-      setDemoMode(false); // Stop demo mode after the last scenario
-    }, 60000);
+  const stopDemo = () => {
+    demoTimeoutIds.current.forEach(id => clearTimeout(id));
+    demoTimeoutIds.current = [];
+    setDemoMode(false);
+    setDemoAlerts([]);
+    window.dispatchEvent(new CustomEvent('highlightCycle', { detail: { nodes: [] } }));
   };
 
   const toggleLiveFeed = () => {
@@ -326,7 +364,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         try {
           const txnId = `live_${Date.now()}`;
           const mlRes = await scoreTransaction('custom', txnId, mlPayload);
-          const score = mlRes.risk_score || Math.floor(Math.random() * 100);
+          const score = mlRes?.score ?? Math.floor(Math.random() * 100);
 
           let status: 'blocked' | 'flagged' | 'review' | 'clear' = 'clear';
           let type = 'Legitimate';
@@ -346,7 +384,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         } catch (e) {
           console.error("Live feed error:", e);
         }
-      }, 3000); // 1 transaction every 3 seconds
+      }, 8000);
     }
     return () => { if (interval) clearInterval(interval); };
   }, [liveFeedActive]);
@@ -453,15 +491,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             </button>
 
             <button
-              onClick={demoMode ? undefined : startDemo}
-              disabled={demoMode}
+              onClick={demoMode ? stopDemo : startDemo}
               className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all duration-300 ${demoMode
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.3)] opacity-50 cursor-not-allowed'
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50'
                 : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'
                 }`}
             >
               {demoMode ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {demoMode ? 'Demo Scenario Running...' : 'Start Demo Scenario'}
+              {demoMode ? 'Stop Demo' : 'Start Demo Scenario'}
             </button>
           </div>
         </div>
@@ -517,7 +554,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </p>
               <p className="text-2xl font-black tracking-tight relative z-10 number-glow" style={{ color: 'var(--text)' }}>
                 {stat.prefix || ''}
-                <CountUp end={stat.value} duration={1.5} formattingFn={(num) => num.toLocaleString('en-IN')} delay={0.1 + i * 0.1} />
+                <CountUp
+                  key={stat.label}
+                  start={stat.value}
+                  end={stat.value}
+                  duration={0}
+                  formattingFn={(num) => num.toLocaleString('en-IN')}
+                  preserveValue={true}
+                />
               </p>
 
               {stat.label === 'FRAUD PREVENTED' && (
@@ -645,13 +689,37 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors"
-                      onClick={() => setDemoAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                      onClick={async () => {
+                        try {
+                          await api.createTransaction({
+                            sender: `demo_${alert.type}`,
+                            receiver: 'BLOCKED',
+                            amount: 0,
+                            score: 95,
+                            type: alert.title,
+                            status: 'blocked',
+                          });
+                        } catch (e) { /* silent */ }
+                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                      }}
                     >
                       Block
                     </button>
                     <button
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
-                      onClick={() => setDemoAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                      onClick={async () => {
+                        try {
+                          await api.createTransaction({
+                            sender: `demo_${alert.type}`,
+                            receiver: 'VERIFIED',
+                            amount: 0,
+                            score: 15,
+                            type: alert.title,
+                            status: 'clear',
+                          });
+                        } catch (e) { /* silent */ }
+                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                      }}
                     >
                       Verify
                     </button>

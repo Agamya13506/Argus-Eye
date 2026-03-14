@@ -245,33 +245,20 @@ export default function ThreatIntel() {
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div style={{ width: '80px' }}>
+            <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+              <div style={{ width: '68px' }} className="flex-shrink-0">
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
-                <div className="text-lg font-bold" style={{
+                <div className="text-lg font-bold whitespace-nowrap" style={{
                   color: threat.score >= 86 ? '#f43f5e' :
                     threat.score >= 61 ? '#f97316' :
                       threat.score >= 31 ? '#f59e0b' : 'var(--muted)'
                 }}>
                   {threat.score}
                 </div>
-                <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)', width: '80px' }}>
-                  <motion.div
-                    className="h-full rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${threat.score}%` }}
-                    transition={{ duration: 0.8, delay: 0.1 }}
-                    style={{
-                      background: threat.score >= 86 ? '#f43f5e' :
-                        threat.score >= 61 ? '#f97316' :
-                          threat.score >= 31 ? '#f59e0b' : '#64748b'
-                    }}
-                  />
-                </div>
               </div>
 
-              <div className="w-32">
-                <div className={`text-[10px] font-bold uppercase tracking-wider text-center py-1 rounded-md border ${threat.status === 'BLOCKLISTED' ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' :
+              <div className="w-24 flex-shrink-0">
+                <div className={`text-[10px] font-bold uppercase tracking-wider text-center py-1 rounded-md border whitespace-nowrap ${threat.status === 'BLOCKLISTED' ? 'bg-rose-500/15 text-rose-400 border-rose-500/20' :
                   threat.status === 'CONFIRMED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/15' :
                     threat.status === 'CORROBORATED' ? 'bg-amber-500/10 text-amber-400 border-amber-500/15' :
                       'bg-rose-500/10 text-rose-400 border-rose-500/15'

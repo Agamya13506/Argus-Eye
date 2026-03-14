@@ -166,7 +166,18 @@ export const api = {
       console.error('Dismiss threat error:', e);
       return null;
     }
-  }
+  },
+
+  async getAuditLogs() {
+    try {
+      const res = await fetch(`${API_BASE}/audit-logs`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data?.documents) ? data.documents : (Array.isArray(data) ? data : []);
+    } catch (e) {
+      return [];
+    }
+  },
 };
 
 export default api;

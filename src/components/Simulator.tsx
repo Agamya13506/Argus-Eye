@@ -106,38 +106,23 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
     const baseScore = mlResult?.score ?? getVectorScore(selectedVector);
     const logs: typeof simLogs = [];
 
-    // Simulate 8 requests but ping the ML backend for real variance if available
+    // Deterministic variance from real ML score — no extra ML calls
+    const VARIANCE_PATTERN = [-6, +3, -2, +5, -4, +2, -3, +4];
     for (let i = 0; i < 8; i++) {
-      let currentIterScore = baseScore;
-
-      if (selectedVector === 'custom') {
-        // for custom, add random jitter
-        const variance = (Math.random() * 10) - 5;
-        currentIterScore = Math.min(99, Math.max(1, baseScore + variance));
-      } else {
-        // Fetch a real jittered score from the backend by passing a unique txnId
-        const iterTxnId = `${txnId}_iter_${i}`;
-        const iterRes = await scoreTransaction(selectedVector, iterTxnId, customPayload);
-        if (iterRes && iterRes.score) {
-          currentIterScore = iterRes.score;
-        } else {
-          const variance = (i % 3 === 0 ? -8 : i % 3 === 1 ? +4 : -2);
-          currentIterScore = Math.min(99, Math.max(40, baseScore + variance));
-        }
-      }
-
-      const score = Math.round(currentIterScore * 10) / 10;
-      const status = score >= 75 ? 'BLOCKED' : score >= 40 ? 'FLAGGED' : 'PASSED';
-
+      const variance = VARIANCE_PATTERN[i];
+      const iterScore = Math.round(
+        Math.min(99, Math.max(1, baseScore + variance)) * 10
+      ) / 10;
+      const status = iterScore >= 75 ? 'BLOCKED' : iterScore >= 40 ? 'FLAGGED' : 'PASSED';
       logs.push({
         id: 1000 + i + 1,
         time: `00:0${Math.floor(i / 2)}:${String((i * 7) % 60).padStart(2, '0')}`,
         status,
-        score,
+        score: iterScore,
       });
       setSimLogs([...logs]);
       setSimProgress(Math.min(100, Math.round(((i + 1) / 8) * 100)));
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 350));
     }
 
     // Store ML results for display
@@ -657,10 +642,26 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total Transactions', value: '12,450', color: 'var(--text)' },
-            { label: 'Fraudulent', value: '3,280', color: '#f43f5e' },
-            { label: 'Legitimate', value: '9,170', color: '#e11d48' },
-            { label: 'Fraud Rate', value: '26.3%', color: '#fb7185' },
+            {
+              label: 'Total Scored',
+              value: results.length > 0 ? results[0].total.toLocaleString() : '—',
+              color: 'var(--text)'
+            },
+            {
+              label: 'Fraud Detected',
+              value: results.length > 0 ? results[0].detected.toLocaleString() : '—',
+              color: '#f43f5e'
+            },
+            {
+              label: 'Blocked',
+              value: results.length > 0 ? results[0].blocked.toLocaleString() : '—',
+              color: '#e11d48'
+            },
+            {
+              label: 'ML Score',
+              value: mlScore !== null ? mlScore.toFixed(1) : '—',
+              color: mlScore !== null ? (mlScore >= 75 ? '#f43f5e' : mlScore >= 40 ? '#fbbf24' : '#4ade80') : 'var(--muted)'
+            },
           ].map((stat, i) => (
             <motion.div key={i} whileHover={{ y: -2 }} className="glass-card p-4 rounded-xl text-center">
               <div className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
