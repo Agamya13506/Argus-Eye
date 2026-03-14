@@ -71,7 +71,64 @@ const mockCases = [
   { $id: 'c3', id: 'CASE-8840', priority: 72, amount: '₹8,500', type: 'Suspicious', time: '25m ago', status: 'HIGH', description: 'Unusual transaction pattern from new device' },
   { $id: 'c4', id: 'CASE-8839', priority: 65, amount: '₹12,000', type: 'Money Mule', time: '1h ago', status: 'HIGH', description: 'Rapid layering of funds through multiple accounts' },
   { $id: 'c5', id: 'CASE-8838', priority: 45, amount: '₹2,500', type: 'Card Testing', time: '2h ago', status: 'ROUTINE', description: 'Multiple small transactions testing card validity' },
+  { $id: 'c6', id: 'CASE-8837', priority: 55, amount: '₹50,000', type: 'Phishing', time: '3h ago', status: 'HIGH', description: 'Phishing attack detected with social engineering tactics' },
 ];
+
+const CASE_DETAILS: Record<string, {
+  sender: string; receiver: string; location: string; rbi: string;
+}> = {
+  'Account Takeover': {
+    sender: 'user_44 (Verified)',
+    receiver: 'user_8 (New Device)',
+    location: 'Mumbai → Delhi (8 min)',
+    rbi: 'RBI/2021-22/56',
+  },
+  'SIM Swap': {
+    sender: 'user_sim_99 (Verified)',
+    receiver: 'merch_finance_7 (Suspicious)',
+    location: 'Bengaluru (3:14am)',
+    rbi: 'RBI/2020-21/58',
+  },
+  'Card Testing': {
+    sender: 'user_321 (New Account)',
+    receiver: 'merch_crypto (Flagged)',
+    location: 'Delhi (Velocity: 23 txns)',
+    rbi: 'RBI/2021-22/74',
+  },
+  'Money Mule': {
+    sender: 'user_67 (Suspicious)',
+    receiver: 'user_92 (New Account)',
+    location: 'Mumbai → Hyderabad',
+    rbi: 'RBI/FIU-IND Circular 2022',
+  },
+  'Phishing': {
+    sender: 'user_social_12 (Verified)',
+    receiver: 'new_recipient_888 (First Time)',
+    location: 'Chennai (11pm)',
+    rbi: 'RBI/DPSS.CO.PD/2017-18/269',
+  },
+  'Suspicious': {
+    sender: 'user_77 (Verified)',
+    receiver: 'merch_12 (Review)',
+    location: 'Pune (Unusual Hour)',
+    rbi: 'RBI/2021-22/56',
+  },
+};
+
+const getRecoveryProb = (caseData: typeof mockCases[0]) => {
+  const baseProbMap: Record<string, number> = {
+    'Account Takeover': 45,
+    'SIM Swap':         52,
+    'Card Testing':     78,
+    'Money Mule':       28,
+    'Phishing':         61,
+    'Suspicious':       70,
+  };
+  const base = baseProbMap[caseData.type] || 55;
+  const hoursElapsed = Math.max(0, (100 - caseData.priority) / 10);
+  const decayed = Math.max(5, base - (hoursElapsed * 3));
+  return Math.round(decayed);
+};
 
 export default function Investigation() {
   const [cases, setCases] = useState(mockCases);
@@ -296,51 +353,94 @@ export default function Investigation() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-3 gap-6 mb-8">
-              <div className="glass-card p-5 rounded-xl">
-                <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--muted)' }}>Transaction Details</h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm" style={{ color: 'var(--muted)' }}>Sender</span>
-                    <span className="font-medium text-sm" style={{ color: 'var(--text)' }}>user_44 (Verified)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm" style={{ color: 'var(--muted)' }}>Receiver</span>
-                    <span className="font-medium text-sm text-rose-400 flex items-center gap-1">
-                      <ShieldAlert className="w-3 h-3" /> user_8 (New Device)
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm" style={{ color: 'var(--muted)' }}>Location</span>
-                    <span className="font-medium text-sm" style={{ color: 'var(--text)' }}>Mumbai → Delhi (8 min)</span>
-                  </div>
+            {selectedCase.type === 'Account Takeover' && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="glass-card p-4 rounded-xl mb-4 border border-rose-500/20"
+                style={{ background: 'rgba(244,63,94,0.06)' }}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
+                    Geographic Impossibility Detected
+                  </span>
                 </div>
-              </div>
-
-              <div className="glass-card p-5 rounded-xl">
-                <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
-                <div className="w-full space-y-3 mt-3" key={selectedCase.$id}>
-                  {limeBars.map(bar => (
-                    <div key={bar.label} className="flex items-center gap-2">
-                      <span className="text-xs w-24 text-right" style={{ color: 'var(--muted)' }}>{bar.label}</span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: bar.width }}
-                          transition={{ duration: 1, delay: 0.5 }}
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: bar.color }}
-                        />
+                <div className="flex items-center gap-3">
+                  <div className="text-center">
+                    <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>Mumbai</div>
+                    <div className="text-[10px]" style={{ color: 'var(--muted)' }}>08:42 AM</div>
+                  </div>
+                  <div className="flex-1 relative">
+                    <div className="h-0.5 bg-rose-500/40 w-full" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="glass-card px-2 py-0.5 rounded text-[10px] font-bold text-rose-400">
+                        1,156 km in 8 min
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>Delhi</div>
+                    <div className="text-[10px]" style={{ color: 'var(--muted)' }}>08:50 AM</div>
+                  </div>
                 </div>
-              </div>
+                <div className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
+                  Implied speed: <span className="text-rose-400 font-bold">8,670 km/h</span> — Account takeover highly probable
+                </div>
+              </motion.div>
+            )}
 
+            <div className="grid grid-cols-1 gap-4 mb-6">
               <div className="glass-card p-5 rounded-xl">
-                <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>SHAP Fraud DNA</h4>
-                <div className="h-[200px]">
-                  <canvas ref={canvasRef} />
+                <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--muted)' }}>Transaction Details</h4>
+                {(() => {
+                  const caseDetail = CASE_DETAILS[selectedCase.type] || CASE_DETAILS['Suspicious'];
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm" style={{ color: 'var(--muted)' }}>Sender</span>
+                        <span className="font-medium text-sm" style={{ color: 'var(--text)' }}>{caseDetail.sender}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm" style={{ color: 'var(--muted)' }}>Receiver</span>
+                        <span className="font-medium text-sm text-rose-400 flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3" /> {caseDetail.receiver}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm" style={{ color: 'var(--muted)' }}>Location</span>
+                        <span className="font-medium text-sm" style={{ color: 'var(--text)' }}>{caseDetail.location}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="glass-card p-5 rounded-xl">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
+                  <div className="w-full space-y-3 mt-3" key={selectedCase.$id}>
+                    {limeBars.map(bar => (
+                      <div key={bar.label} className="flex items-center gap-2">
+                        <span className="text-xs w-24 text-right" style={{ color: 'var(--muted)' }}>{bar.label}</span>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: bar.width }}
+                            transition={{ duration: 1, delay: 0.5 }}
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: bar.color }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="glass-card p-5 rounded-xl">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>SHAP Fraud DNA</h4>
+                  <div className="h-[200px]">
+                    <canvas ref={canvasRef} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -351,7 +451,7 @@ export default function Investigation() {
                 <div className="flex items-center justify-between p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
                   <div>
                     <div className="text-rose-400 font-medium text-sm">Freeze Account Immediately</div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>RBI Ref: RBI/2021-22/56</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>RBI Ref: {CASE_DETAILS[selectedCase.type]?.rbi || 'RBI/2021-22/56'}</div>
                   </div>
                   <button onClick={handleBlock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
                     Execute
@@ -368,6 +468,57 @@ export default function Investigation() {
                 </div>
               </div>
             </div>
+
+            {(() => {
+              const recoveryProb = getRecoveryProb(selectedCase);
+              const recoveryColor = recoveryProb > 60 ? '#4ade80' :
+                                    recoveryProb > 30 ? '#fbbf24' : '#f43f5e';
+              const recoveryAction = recoveryProb > 60
+                ? 'Process chargeback immediately — high recovery window'
+                : recoveryProb > 30
+                ? 'Escalate to senior analyst — window closing'
+                : 'Escalate to FIU-IND — low recovery probability';
+
+              return (
+                <div className="glass-card p-5 rounded-xl mb-6">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-4"
+                      style={{ color: 'var(--muted)' }}>
+                    Recovery Probability
+                  </h4>
+                  <div className="flex items-center gap-6">
+                    <div className="relative w-20 h-20 flex-shrink-0">
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" fill="none" strokeWidth="6"
+                                style={{ stroke: 'var(--border)' }} />
+                        <motion.circle
+                          cx="40" cy="40" r="32" fill="none" strokeWidth="6"
+                          strokeLinecap="round"
+                          strokeDasharray={201.06}
+                          initial={{ strokeDashoffset: 201.06 }}
+                          animate={{ strokeDashoffset: 201.06 - (201.06 * recoveryProb / 100) }}
+                          transition={{ duration: 1, delay: 0.3 }}
+                          stroke={recoveryColor}
+                          key={selectedCase.$id}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold" style={{ color: recoveryColor }}>
+                          {recoveryProb}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>
+                        {recoveryAction}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--muted)' }}>
+                        Probability decays 3% per hour. Act now to maximise recovery.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Case Notes */}
             <div className="glass-card p-5 rounded-xl">

@@ -12,6 +12,7 @@ import NetworkGraph from './components/NetworkGraph';
 import Analytics from './components/Analytics';
 import Compliance from './components/Compliance';
 import Simulator from './components/Simulator';
+import SplitScreen from './components/SplitScreen';
 import LoginPage from './components/LoginPage';
 import Settings from './components/Settings';
 
@@ -63,7 +64,11 @@ function AppContent() {
                 {activeTab === 'login' && !user && (
                   <LoginPage key="login" onLogin={handleLogin} />
                 )}
-                {user && activeTab === 'dashboard' && <Dashboard key="dashboard" />}
+                {user && activeTab === 'dashboard' && (
+                  <div key="dashboard" className="p-8 min-h-screen">
+                    <Dashboard onNavigate={setActiveTab} />
+                  </div>
+                )}
                 {user && activeTab === 'threat-intel' && (
                   <div key="threat-intel" className="p-8 min-h-screen">
                     <ThreatIntel />
@@ -74,6 +79,7 @@ function AppContent() {
                 {user && activeTab === 'analytics' && <Analytics key="analytics" />}
                 {user && activeTab === 'compliance' && <Compliance key="compliance" />}
                 {user && activeTab === 'simulator' && <Simulator key="simulator" />}
+                {user && activeTab === 'splitscreen' && <SplitScreen key="splitscreen" />}
                 {user && activeTab === 'settings' && <Settings key="settings" />}
               </AnimatePresence>
             </main>

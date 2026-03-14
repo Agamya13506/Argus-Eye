@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, AlertTriangle, Search, Share2,
-  BarChart3, Shield, Beaker, Settings, Sun, Moon, LogOut
+  BarChart3, Shield, Beaker, Settings, Sun, Moon, LogOut, Columns
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,6 +20,7 @@ const allNavItems = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['analyst', 'manager', 'admin'] },
   { id: 'compliance', label: 'Compliance', icon: Shield, roles: ['manager', 'admin'] },
   { id: 'simulator', label: 'Simulator', icon: Beaker, roles: ['admin'] },
+  { id: 'splitscreen', label: 'Split Screen', icon: Columns, roles: ['analyst', 'manager', 'admin'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];
 

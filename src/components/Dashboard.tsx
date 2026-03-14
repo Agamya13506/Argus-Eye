@@ -40,7 +40,10 @@ interface Alert {
   timestamp: number;
 }
 
-export default function Dashboard() {
+interface DashboardProps {
+  onNavigate?: (tab: string) => void;
+}
+export default function Dashboard({ onNavigate }: DashboardProps) {
   const [stats, setStats] = useState(mockStats);
   const [transactions, setTransactions] = useState(mockTransactions);
   const [health, setHealth] = useState({
@@ -52,6 +55,8 @@ export default function Dashboard() {
   const [demoMode, setDemoMode] = useState(false);
   const [demoAlerts, setDemoAlerts] = useState<Alert[]>([]);
   const [manualFire, setManualFire] = useState(false);
+  const [fraudSaved, setFraudSaved] = useState(0);
+  const [recentBlock, setRecentBlock] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -81,16 +86,20 @@ export default function Dashboard() {
     let unsubscribe: () => void;
     try {
       unsubscribe = appwriteClient.subscribe(
-        'databases.argus_eye_db.collections.transactions.documents',
+        'databases/argus_eye_db/collections/transactions/documents',
         (response: any) => {
           if (response.events.includes('databases.*.collections.*.documents.*.create')) {
             setTransactions((prev: any[]) => [response.payload, ...prev].slice(0, 50));
             if (response.payload.status === 'blocked') {
+              const amount = response.payload.amount || 0;
               setStats((prev: any) => ({
                 ...prev,
                 fraudDetected: prev.fraudDetected + 1,
-                fraudPrevented: prev.fraudPrevented + (response.payload.amount || 0)
+                fraudPrevented: prev.fraudPrevented + amount
               }));
+              setFraudSaved(prev => prev + amount);
+              setRecentBlock(amount);
+              setTimeout(() => setRecentBlock(null), 2000);
             }
             setStats((prev: any) => ({
               ...prev,
@@ -99,8 +108,9 @@ export default function Dashboard() {
           }
         }
       );
-    } catch (e) {
-      console.log('Appwrite realtime not available');
+      console.log('Appwrite Realtime: subscribed to transactions');
+    } catch (e: any) {
+      console.error('Appwrite Realtime failed:', e.message);
     }
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
@@ -220,7 +230,7 @@ export default function Dashboard() {
   const statCards = [
     { label: 'TOTAL TRANSACTIONS', value: stats.totalTransactions, icon: Activity, change: '+12%', up: true, color: '#fb7185' },
     { label: 'FRAUD DETECTED', value: stats.fraudDetected, icon: AlertTriangle, change: '-5%', up: false, color: '#f43f5e' },
-    { label: 'FRAUD PREVENTED', value: stats.fraudPrevented, prefix: '₹', icon: DollarSign, change: '+8%', up: true, color: '#e11d48' },
+    { label: 'FRAUD PREVENTED', value: stats.fraudPrevented + fraudSaved, prefix: '₹', icon: DollarSign, change: '+8%', up: true, color: '#e11d48', recentBlock },
     { label: 'ACTIVE THREATS', value: stats.threatsIdentified, icon: Shield, change: '+3', up: true, color: '#be123c' },
   ];
 
@@ -371,8 +381,18 @@ export default function Dashboard() {
               </p>
               <p className="text-2xl font-black tracking-tight relative z-10 number-glow" style={{ color: 'var(--text)' }}>
                 {stat.prefix || ''}
-                <CountUp end={stat.value} duration={2} separator="," delay={0.3 + i * 0.1} />
+                <CountUp end={stat.value} duration={1} separator="," delay={0.3 + i * 0.1} />
               </p>
+              {stat.label === 'FRAUD PREVENTED' && recentBlock && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="text-xs font-bold text-emerald-400 mt-1"
+                >
+                  +₹{recentBlock.toLocaleString()} prevented
+                </motion.div>
+              )}
             </motion.div>
           );
         })}
@@ -468,7 +488,20 @@ export default function Dashboard() {
                 <div>
                   <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
                   <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
-                  <button className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                  <button
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--accent)' }}
+                    onClick={() => {
+                      if (alert.type === 'circular') {
+                        window.dispatchEvent(new CustomEvent('highlightCycle', {
+                          detail: { nodes: ['user_44', 'user_8', 'user_89'] }
+                        }));
+                        onNavigate?.('network');
+                      } else {
+                        onNavigate?.('investigation');
+                      }
+                    }}
+                  >
                     Investigate →
                   </button>
                 </div>

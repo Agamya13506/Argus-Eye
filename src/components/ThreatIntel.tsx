@@ -43,7 +43,7 @@ export default function ThreatIntel() {
     let unsubscribe: () => void;
     try {
       unsubscribe = appwriteClient.subscribe(
-        'databases.argus_eye_db.collections.threats.documents',
+        'databases/argus_eye_db/collections/threats/documents',
         (response: any) => {
           const payload = response.payload;
           if (response.events.includes('databases.*.collections.*.documents.*.create')) {
@@ -56,8 +56,9 @@ export default function ThreatIntel() {
           }
         }
       );
-    } catch (e) {
-      console.log('Appwrite realtime not available');
+      console.log('Appwrite Realtime: subscribed to threats');
+    } catch (e: any) {
+      console.error('Appwrite Realtime failed:', e.message);
     }
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);

@@ -27,17 +27,31 @@ export default function Simulator() {
   const [results, setResults] = useState<SimResult[]>([]);
   const [simLogs, setSimLogs] = useState<Array<{ id: number; time: string; status: string; score: number }>>([]);
 
+  function getVectorScore(vectorId: string, iteration: number): number {
+    const baseScores: Record<string, number> = {
+      card_testing:     88,
+      velocity:         91,
+      account_takeover: 94,
+      geo_imposter:     89,
+      mule:             82,
+      phishing:         86,
+    };
+    const base = baseScores[vectorId] || 85;
+    const variance = (iteration % 3 === 0 ? -8 :
+                      iteration % 3 === 1 ? +4 : -2);
+    return Math.min(99, Math.max(60, base + variance));
+  }
+
   const startSimulation = async () => {
     setIsRunning(true);
     setSimProgress(0);
     setSimLogs([]);
     setResults([]);
 
-    // Simulate progress with random events
     const logs: typeof simLogs = [];
     for (let i = 0; i < 8; i++) {
       await new Promise(r => setTimeout(r, 300));
-      const score = Math.floor(Math.random() * 100);
+      const score = getVectorScore(selectedVector, i);
       const status = score >= 75 ? 'BLOCKED' : score >= 40 ? 'FLAGGED' : 'PASSED';
       logs.push({
         id: 1000 + i + 1,
@@ -49,12 +63,20 @@ export default function Simulator() {
       setSimProgress(Math.min(100, Math.round(((i + 1) / 8) * 100)));
     }
 
-    // Generate results
     const vectorName = attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
-    const total = 800 + Math.floor(Math.random() * 500);
-    const detected = Math.floor(total * (0.88 + Math.random() * 0.1));
-    const blocked = Math.floor(detected * (0.92 + Math.random() * 0.06));
-    const falsePos = Math.floor(total * 0.02 * Math.random());
+    const vectorStats: Record<string, { detection: number; block: number }> = {
+      card_testing:     { detection: 0.94, block: 0.97 },
+      velocity:         { detection: 0.96, block: 0.98 },
+      account_takeover: { detection: 0.91, block: 0.95 },
+      geo_imposter:     { detection: 0.93, block: 0.96 },
+      mule:             { detection: 0.88, block: 0.92 },
+      phishing:         { detection: 0.89, block: 0.93 },
+    };
+    const stats = vectorStats[selectedVector] || { detection: 0.90, block: 0.94 };
+    const total = 800 + Math.floor(selectedVector.length * 47);
+    const detected = Math.floor(total * stats.detection);
+    const blocked = Math.floor(detected * stats.block);
+    const falsePos = Math.floor(total * 0.012);
 
     setResults([{ vector: vectorName, total, detected, blocked, falsePos }]);
     setIsRunning(false);

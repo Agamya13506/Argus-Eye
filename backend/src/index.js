@@ -41,6 +41,94 @@ async function initializeAppwrite() {
       try { await appwriteFetch(`/databases/${DATABASE_ID}/collections/${col.id}`); }
       catch (e) { await appwriteFetch(`/databases/${DATABASE_ID}/collections`, 'POST', { collectionId: col.id, name: col.name }); }
     }
+
+    await new Promise(r => setTimeout(r, 3000));
+    const threatAttrs = [
+      { key: 'entityId',          type: 'string',  size: 256,    required: true  },
+      { key: 'entityType',        type: 'string',  size: 64,     required: true  },
+      { key: 'source',            type: 'string',  size: 32,     required: false },
+      { key: 'reports',           type: 'integer', required: false, default: 0   },
+      { key: 'score',             type: 'integer', required: false, default: 0   },
+      { key: 'status',            type: 'string',  size: 64,     required: false },
+      { key: 'time',              type: 'string',  size: 64,     required: false },
+      { key: 'analyst_confirmed', type: 'boolean', required: false, default: false },
+    ];
+    for (const attr of threatAttrs) {
+      try {
+        const endpoint = `/databases/${DATABASE_ID}/collections/threats/attributes/${attr.type === 'integer' ? 'integer' : attr.type === 'boolean' ? 'boolean' : 'string'}`;
+        await appwriteFetch(endpoint, 'POST', {
+          key: attr.key,
+          required: attr.required,
+          ...(attr.type === 'string' ? { size: attr.size } : {}),
+          ...(attr.default !== undefined ? { default: attr.default } : {}),
+        });
+      } catch (e) {}
+    }
+
+    await new Promise(r => setTimeout(r, 3000));
+    const txAttrs = [
+      { key: 'amount',     type: 'integer', required: false, default: 0     },
+      { key: 'sender',     type: 'string',  size: 256,       required: false },
+      { key: 'receiver',   type: 'string',  size: 256,       required: false },
+      { key: 'score',      type: 'integer', required: false, default: 0     },
+      { key: 'type',       type: 'string',  size: 64,        required: false },
+      { key: 'status',     type: 'string',  size: 32,        required: false },
+      { key: 'timestamp',  type: 'string',  size: 64,        required: false },
+      { key: 'simulated',  type: 'boolean', required: false, default: false  },
+    ];
+    for (const attr of txAttrs) {
+      try {
+        const endpoint = `/databases/${DATABASE_ID}/collections/transactions/attributes/${attr.type === 'integer' ? 'integer' : attr.type === 'boolean' ? 'boolean' : 'string'}`;
+        await appwriteFetch(endpoint, 'POST', {
+          key: attr.key,
+          required: attr.required,
+          ...(attr.type === 'string' ? { size: attr.size } : {}),
+          ...(attr.default !== undefined ? { default: attr.default } : {}),
+        });
+      } catch (e) {}
+    }
+
+    await new Promise(r => setTimeout(r, 3000));
+    const auditAttrs = [
+      { key: 'action',      type: 'string', size: 128, required: false },
+      { key: 'entityId',    type: 'string', size: 256, required: false },
+      { key: 'analystId',   type: 'string', size: 128, required: false },
+      { key: 'rbi_reference', type: 'string', size: 128, required: false },
+      { key: 'timestamp',   type: 'string', size: 64,  required: false },
+    ];
+    for (const attr of auditAttrs) {
+      try {
+        const endpoint = `/databases/${DATABASE_ID}/collections/audit_logs/attributes/${attr.type === 'integer' ? 'integer' : attr.type === 'boolean' ? 'boolean' : 'string'}`;
+        await appwriteFetch(endpoint, 'POST', {
+          key: attr.key,
+          required: attr.required,
+          ...(attr.type === 'string' ? { size: attr.size } : {}),
+          ...(attr.default !== undefined ? { default: attr.default } : {}),
+        });
+      } catch (e) {}
+    }
+
+    await new Promise(r => setTimeout(r, 3000));
+    const caseAttrs = [
+      { key: 'title',       type: 'string', size: 256, required: false },
+      { key: 'description', type: 'string', size: 1024, required: false },
+      { key: 'priority',    type: 'string', size: 32,  required: false },
+      { key: 'status',      type: 'string', size: 32,  required: false },
+      { key: 'assignedTo',  type: 'string', size: 128, required: false },
+      { key: 'createdAt',   type: 'string', size: 64,  required: false },
+    ];
+    for (const attr of caseAttrs) {
+      try {
+        const endpoint = `/databases/${DATABASE_ID}/collections/cases/attributes/${attr.type === 'integer' ? 'integer' : attr.type === 'boolean' ? 'boolean' : 'string'}`;
+        await appwriteFetch(endpoint, 'POST', {
+          key: attr.key,
+          required: attr.required,
+          ...(attr.type === 'string' ? { size: attr.size } : {}),
+          ...(attr.default !== undefined ? { default: attr.default } : {}),
+        });
+      } catch (e) {}
+    }
+
     console.log('Appwrite ready');
   } catch (error) { console.error('Init error:', error.message); }
 }
