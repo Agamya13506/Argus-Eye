@@ -365,9 +365,57 @@ export default function Investigation() {
   }, []);
 
   useEffect(() => {
-    const handler = (e: CustomEvent) => {
-      const match = cases.find(c => c.type === e.detail.caseType);
-      if (match) setSelectedCase(match);
+    const handler = async (e: CustomEvent) => {
+      const { caseType, caseId, caseTitle } = e.detail;
+
+      // Re-fetch cases from backend to pick up newly created case
+      try {
+        const data = await api.getCases();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((c: any, i: number) => ({
+            $id: c.$id,
+            id: c.caseId || `CASE-${8842 - i}`,
+            priority: c.priority === 'critical' ? 95 : c.priority === 'high' ? 80 : 55,
+            amount: `₹${(c.amount || 0).toLocaleString()}`,
+            type: c.title || c.type || 'Unknown',
+            time: c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            status: c.priority === 'critical' ? 'URGENT' : c.priority === 'high' ? 'HIGH' : 'ROUTINE',
+            description: c.description || 'No description',
+          }));
+          mapped.sort((a: any, b: any) => b.priority - a.priority);
+          setCases(mapped);
+
+          // Try matching by Appwrite $id first
+          if (caseId) {
+            const idMatch = mapped.find((c: any) => c.$id === caseId);
+            if (idMatch) { setSelectedCase(idMatch); return; }
+          }
+
+          // Try matching by title
+          if (caseTitle) {
+            const titleMatch = mapped.find((c: any) => c.type === caseTitle);
+            if (titleMatch) { setSelectedCase(titleMatch); return; }
+          }
+
+          // Fuzzy match by type name (e.g. "Card Testing" in "Velocity Attack — sim_user_001")
+          const fuzzyMatch = mapped.find((c: any) =>
+            c.type === caseType ||
+            c.type.includes(caseType) ||
+            caseType.includes(c.type)
+          );
+          if (fuzzyMatch) { setSelectedCase(fuzzyMatch); return; }
+        }
+      } catch (e) {
+        console.error('Failed to re-fetch cases on investigate:', e);
+      }
+
+      // Fallback: try matching in existing local cases
+      const localMatch = cases.find(c =>
+        c.type === caseType ||
+        c.type.includes(caseType) ||
+        caseType.includes(c.type)
+      );
+      if (localMatch) setSelectedCase(localMatch);
     };
     window.addEventListener('investigationSelect', handler as EventListener);
     return () => window.removeEventListener('investigationSelect', handler as EventListener);

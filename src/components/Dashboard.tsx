@@ -40,6 +40,11 @@ interface Alert {
   description: string;
   rbiRef: string;
   timestamp: number;
+  sender: string;
+  receiver: string;
+  amount: number;
+  caseTitle: string;
+  fraudType: string;
 }
 
 interface DashboardProps {
@@ -72,8 +77,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     async function fetchData() {
       try {
         const [statsRes, txRes] = await Promise.all([api.getStats(), api.getTransactions()]);
-        if (statsRes) setStats(statsRes);
-        if (Array.isArray(txRes)) setTransactions(txRes);
+        if (statsRes && statsRes.totalTransactions) setStats(statsRes);
+        if (Array.isArray(txRes) && txRes.length > 0) setTransactions(txRes);
       } catch (e) { console.error('Error fetching initial data:', e) }
     }
     fetchData();
@@ -154,7 +159,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           title: 'VELOCITY ATTACK',
           description: '23 micro-transactions in 58 seconds from sim_user_001. Auto-blocked.',
           rbiRef: 'RBI/2021-22/56',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sender: 'sim_user_001',
+          receiver: 'sim_merch_crypto',
+          amount: 2500,
+          caseTitle: 'Velocity Attack — sim_user_001',
+          fraudType: 'Card Testing'
         };
         scoreTransaction('velocity', alertId).then(mlRes => {
           const score = mlRes?.score ?? 91;
@@ -196,7 +206,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           title: 'GEOGRAPHIC IMPOSSIBILITY',
           description: 'Mumbai → Delhi: 1,156 km in 8 minutes (8,670 km/h). Account takeover probable.',
           rbiRef: 'RBI/2020-21/112',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sender: 'user_geo_001',
+          receiver: 'merch_delhi_44',
+          amount: 84000,
+          caseTitle: 'Geographic Impossibility — user_geo_001',
+          fraudType: 'Account Takeover'
         };
         scoreTransaction('geo_imposter', alertId).then(mlRes => {
           const score = mlRes?.score ?? 95;
@@ -235,7 +250,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           title: 'SIM SWAP WARNING',
           description: 'New device detected. ₹84,000 transfer attempted at 3:14am.',
           rbiRef: 'RBI/2018-19/215',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sender: 'user_sim_99',
+          receiver: 'merch_finance_7',
+          amount: 84000,
+          caseTitle: 'SIM Swap — user_sim_99',
+          fraudType: 'SIM Swap'
         };
         scoreTransaction('account_takeover', alertId).then(mlRes => {
           const score = mlRes?.score ?? 88;
@@ -274,7 +294,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           title: 'CIRCULAR FLOW CONFIRMED',
           description: 'user_44 → user_8 → user_89 → user_44. Total: ₹1,77,000. Money laundering pattern detected.',
           rbiRef: 'RBI/2017-18/122 (PMLA)',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sender: 'user_44',
+          receiver: 'user_8',
+          amount: 177000,
+          caseTitle: 'Circular Fund Flow — user_44 ring',
+          fraudType: 'Money Mule'
         };
         onNavigate?.('/network');
         setTimeout(() => {
@@ -313,7 +338,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           title: 'SOCIAL ENGINEERING',
           description: 'Round number, new recipient, 11pm. High manipulation probability.',
           rbiRef: 'RBI/2022-23/89',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          sender: 'user_social_12',
+          receiver: 'new_recipient_888',
+          amount: 50000,
+          caseTitle: 'Social Engineering — user_social_12',
+          fraudType: 'Phishing'
         };
         scoreTransaction('phishing', alertId).then(mlRes => {
           const score = mlRes?.score ?? 76;
@@ -814,19 +844,38 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {
                         console.log('BLOCK clicked for alert:', alert.id);
+
+                        // 1. Optimistically add blocked transaction to local feed
+                        const blockedTx = {
+                          sender: alert.sender,
+                          receiver: alert.receiver,
+                          amount: alert.amount,
+                          score: 95,
+                          type: alert.fraudType,
+                          status: 'blocked' as const,
+                        };
+                        setTransactions(prev => [blockedTx, ...prev].slice(0, 20));
+
+                        // 2. Update stats immediately
+                        setStats(prev => ({
+                          ...prev,
+                          fraudDetected: prev.fraudDetected + 1,
+                          fraudPrevented: prev.fraudPrevented + alert.amount,
+                          totalTransactions: prev.totalTransactions + 1,
+                        }));
+                        setFraudSaved(prev => prev + alert.amount);
+                        fraudSavedRef.current += alert.amount;
+                        setRecentBlock(alert.amount);
+                        setTimeout(() => setRecentBlock(null), 2000);
+
+                        // 3. Remove alert with brief delay for feedback
+                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+
+                        // 4. Persist to backend (fire-and-forget)
                         try {
-                          // Create blocked transaction
-                          await api.createTransaction({
-                            sender: `demo_${alert.type}`,
-                            receiver: 'BLOCKED',
-                            amount: 0,
-                            score: 95,
-                            type: alert.title,
-                            status: 'blocked',
-                          });
-                          // Also create/update a threat
+                          await api.createTransaction(blockedTx);
                           await api.createThreat({
-                            entityId: `demo_${alert.type}`,
+                            entityId: alert.sender,
                             entityType: 'UPI ID',
                             source: 'ANALYST',
                             reports: 1,
@@ -834,66 +883,102 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                             status: 'CONFIRMED',
                             time: 'Just now'
                           });
-                          console.log('Block completed successfully');
+                          await api.createCase({
+                            title: alert.caseTitle,
+                            description: `${alert.description} Analyst action: BLOCKED.`,
+                            priority: 'critical',
+                            status: 'closed',
+                            amount: alert.amount,
+                          });
                         } catch (e) {
-                          console.error('Block error:', e);
-                          alert('Failed to block: ' + e);
+                          console.error('Block persist error:', e);
                         }
-                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
                       }}
                     >
-                      Block
+                      ⛔ Block
                     </button>
                     <button
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {
                         console.log('VERIFY clicked for alert:', alert.id);
-                        try {
-                          await api.createTransaction({
-                            sender: `demo_${alert.type}`,
-                            receiver: 'VERIFIED',
-                            amount: 0,
-                            score: 15,
-                            type: alert.title,
-                            status: 'clear',
-                          });
-                          console.log('Verify completed successfully');
-                        } catch (e) {
-                          console.error('Verify error:', e);
-                          alert('Failed to verify: ' + e);
-                        }
+
+                        // 1. Optimistically add verified (clear) transaction to feed
+                        const verifiedTx = {
+                          sender: alert.sender,
+                          receiver: alert.receiver,
+                          amount: alert.amount,
+                          score: 15,
+                          type: alert.fraudType,
+                          status: 'clear' as const,
+                        };
+                        setTransactions(prev => [verifiedTx, ...prev].slice(0, 20));
+                        setStats(prev => ({
+                          ...prev,
+                          totalTransactions: prev.totalTransactions + 1,
+                        }));
+
+                        // 2. Remove alert
                         setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+
+                        // 3. Persist to backend
+                        try {
+                          await api.createTransaction(verifiedTx);
+                        } catch (e) {
+                          console.error('Verify persist error:', e);
+                        }
                       }}
                     >
-                      Verify
+                      ✓ Approve
                     </button>
                     <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
-                      onClick={() => {
+                      onClick={async () => {
                         if (alert.type === 'circular') {
-                          onNavigate?.('/network');
+                          onNavigate?.('network');
                           setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('highlightCycle', {
                               detail: { nodes: ['user_44', 'user_8', 'user_89'] }
                             }));
                           }, 600);
                         } else {
+                          // 1. Create the case in backend first
+                          let createdCaseId = '';
+                          try {
+                            const caseResult = await api.createCase({
+                              title: alert.caseTitle,
+                              description: `${alert.description} Pending investigation.`,
+                              priority: 'critical',
+                              status: 'open',
+                              amount: alert.amount,
+                            });
+                            createdCaseId = caseResult?.$id || '';
+                          } catch (e) {
+                            console.error('Create case for investigate error:', e);
+                          }
+
+                          // 2. Navigate to investigation
+                          onNavigate?.('investigation');
+
+                          // 3. Dispatch event with both type and caseId
                           const typeMap: Record<string, string> = {
                             velocity: 'Card Testing',
                             geo: 'Account Takeover',
                             sim: 'SIM Swap',
                             social: 'Phishing',
                           };
-                          // Navigate first, then dispatch after Investigation has mounted
-                          onNavigate?.('/investigation');
                           setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('investigationSelect', {
-                              detail: { caseType: typeMap[alert.type] || 'Suspicious' }
+                              detail: {
+                                caseType: typeMap[alert.type] || 'Suspicious',
+                                caseId: createdCaseId,
+                                caseTitle: alert.caseTitle,
+                              }
                             }));
-                          }, 400);
+                          }, 800);
                         }
+                        // Keep the alert visible so user can still block/verify after investigating
                       }}
                     >
                       Investigate →
