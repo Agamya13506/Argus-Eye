@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "appwrite": {
+      "command": "uvx",
+      "args": ["mcp-server-appwrite", "--databases"],
+      "env": {
+        "APPWRITE_PROJECT_ID": "69b423e1001873687a8d",
+        "APPWRITE_API_KEY": "standard_bc2fd0b1bf1a6321335f6a1d9f4714b316be49b26051eac30d61e8de83bf7c806989bbba38314d26c84f11f0fceda0955511b82f230a9f710fc08aa7034141b5866570b92cca4673eae256c447e8534346a8ad684ee3d279c6a250aa102945de781e3befe6f71c87dd131dc1df27bacbc727ed447906a2b2fb78fd33183e7",
+        "APPWRITE_ENDPOINT": "https://nyc.cloud.appwrite.io/v1"
+      }
+    }
+  }
+}

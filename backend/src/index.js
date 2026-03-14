@@ -10,7 +10,7 @@ app.use(express.json());
 
 const APPWRITE_ENDPOINT = 'https://nyc.cloud.appwrite.io/v1';
 const APPWRITE_PROJECT = '69b423e1001873687a8d';
-const APPWRITE_API_KEY = 'standard_bc2fd0b1bf1a6321335f6a1d9f4714b316be49b26051eac30d61e8de83bf7c806989bbba38314d26c84f11f0fceda0955511b82f230a9f710fc08aa7034141b5866570b92cca4673eae256c447e8534346a8ad684ee3d279c6a250aa102945de781e3befe6f71c37c87dd131dc1df27bacbc727ed447906a2b2fb78fd33183e7';
+const APPWRITE_API_KEY = 'standard_02e9cc014ffd457e7ca594569b8d70d519d68ac96f9b512fe3f9b8e01ac7b09016722aa44e9a9f3d11f612f9402c19ae6ab2d756013eafd88a703ead0a4b7308a481a3a5c370c78416fab07933fb54a88250b5a1b9789dbec0ca5ea35e8910df4cd9d763184d69aff433211e3b021ad958a023532f32f9c0d3a1e56a0ea57b7c';
 const DATABASE_ID = 'argus_eye_db';
 
 async function appwriteFetch(endpoint, method = 'GET', body = null) {
