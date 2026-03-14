@@ -39,9 +39,7 @@ async def health():
     return {
         "status": "ok",
         "service": "fraudshield-ml",
-        "threshold": score_transaction.__defaults__[0]
-        if hasattr(score_transaction, "__defaults__")
-        else 0.5,
+        "threshold": 0.5,
     }
 
 

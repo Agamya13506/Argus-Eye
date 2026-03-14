@@ -142,8 +142,9 @@ export default function Investigation() {
   const [kycDone, setKycDone] = useState(false);
 
   const [mlLimeBars, setMlLimeBars] = useState<
-    { label: string; width: string; color: string }[] | null
+    { label: string; width: string; color: string; value: number }[] | null
   >(null);
+  const [limeLoading, setLimeLoading] = useState(false);
   const [corrections, setCorrections] = useState<
     { txn_id: string; true_label: number }[]
   >([]);
@@ -265,73 +266,35 @@ export default function Investigation() {
   useEffect(() => {
     (async () => {
       setMlLimeBars(null);
-
-      // Pre-score this case so LIME/SHAP cache gets populated
-      const CASE_PAYLOADS: Record<string, object> = {
-        'Account Takeover': {
-          txn_id: selectedCase.id, amount_inr: 120000, amount_scaled: 5.0,
-          hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1,
-          account_age_days: 8, city_risk_score: 0.8, is_sim_swap_signal: 1,
-          is_round_amount: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 1,
-          V14: -24.0, V4: 7.0, V12: -18.0, V10: -15.0, V11: -8.0,
-        },
-        'SIM Swap': {
-          txn_id: selectedCase.id, amount_inr: 84000, amount_scaled: 4.2,
-          hour: 3, velocity_60s: 1, is_new_device: 1, is_new_recipient: 1,
-          account_age_days: 15, city_risk_score: 0.75, is_sim_swap_signal: 1,
-          is_round_amount: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
-          V14: -22.0, V4: 6.5, V12: -15.0, V10: -12.0, V11: -7.0,
-        },
-        'Card Testing': {
-          txn_id: selectedCase.id, amount_inr: 250, amount_scaled: 0.01,
-          hour: 14, velocity_60s: 22, is_new_device: 0, is_new_recipient: 0,
-          account_age_days: 400, city_risk_score: 0.3, is_sim_swap_signal: 0,
-          is_round_amount: 0, cat_crypto: 0, cat_grocery: 1, cat_electronics: 0,
-          V14: -20.0, V4: 6.0, V12: -13.0, V10: -10.0, V11: -5.0,
-        },
-        'Money Mule': {
-          txn_id: selectedCase.id, amount_inr: 95000, amount_scaled: 4.5,
-          hour: 22, velocity_60s: 8, is_new_device: 0, is_new_recipient: 1,
-          account_age_days: 20, city_risk_score: 0.5, is_round_amount: 1,
-          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
-          V14: -19.0, V4: 5.5, V12: -12.0, V10: -9.0, V11: -5.0,
-        },
-        'Phishing': {
-          txn_id: selectedCase.id, amount_inr: 50000, amount_scaled: 2.5,
-          hour: 23, velocity_60s: 2, is_new_device: 0, is_new_recipient: 1,
-          account_age_days: 600, city_risk_score: 0.4, is_round_amount: 1,
-          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
-          V14: -18.0, V4: 5.0, V12: -11.0, V10: -8.0, V11: -4.0,
-        },
-        'Suspicious': {
-          txn_id: selectedCase.id, amount_inr: 8500, amount_scaled: 0.4,
-          hour: 10, velocity_60s: 4, is_new_device: 1, is_new_recipient: 0,
-          account_age_days: 200, city_risk_score: 0.35, is_round_amount: 0,
-          is_sim_swap_signal: 0, cat_crypto: 0, cat_grocery: 0, cat_electronics: 0,
-          V14: -12.0, V4: 4.0, V12: -8.0, V10: -6.0, V11: -3.0,
-        },
-      };
-      const casePayload = CASE_PAYLOADS[selectedCase.type] || CASE_PAYLOADS['Suspicious'];
-      fetch('http://localhost:8000/score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(casePayload),
-      }).catch(() => {});
-      await new Promise(r => setTimeout(r, 300));
+      setLimeLoading(true);
+      // Score WITH explanation enabled (skip_explain: false) and wait for it
+      try {
+        await fetch('http://localhost:8000/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...casePayload, txn_id: selectedCase.id, skip_explain: false }),
+        });
+      } catch (_) {}
+      // Wait for LIME to complete — LIME takes 800-1500ms
+      await new Promise(r => setTimeout(r, 1800));
 
       getExplanation(selectedCase.id).then(lime => {
         if (lime && lime.length > 0) {
+          const maxWeight = Math.max(...lime.map((r: any) => Math.abs(r.weight)), 0.0001);
           const bars = lime
             .slice(0, 5)
             .map((r: any) => ({
               label: r.feature.split(' ')[0].replace(/_/g, ' '),
-              value: Number((r.weight * 100).toFixed(1)),
-              width: `${Math.min(99, Math.max(5, Math.abs(r.weight) * 8000))}%`,
+              value: Number((Math.abs(r.weight) / maxWeight * 100).toFixed(1)),
+              width: `${Math.min(99, Math.max(8, (Math.abs(r.weight) / maxWeight) * 99))}%`,
               color: r.weight > 0 ? '#f43f5e' : '#10b981',
             }));
-          if (bars.length > 0) setMlLimeBars(bars);
+          if (bars.length > 0) {
+            setMlLimeBars(bars);
+          }
+          setLimeLoading(false);
         }
-      });
+      }).catch(() => setLimeLoading(false));
 
       getRecommendations(selectedCase.id).then(recs => {
         if (recs && recs.length > 0) setMlRecommendations(recs);
@@ -346,9 +309,12 @@ export default function Investigation() {
   }, [selectedCase.$id]);
 
   useEffect(() => {
-    async function fetchCases() {
+    let mounted = true;
+
+    async function fetchCases(isInitial = false) {
       try {
         const data = await api.getCases();
+        if (!mounted) return;
         if (data?.length > 0) {
           const mapped = data.map((c: any, i: number) => ({
             $id: c.$id,
@@ -360,16 +326,26 @@ export default function Investigation() {
             status: c.priority === 'critical' ? 'URGENT' : c.priority === 'high' ? 'HIGH' : 'ROUTINE',
             description: c.description || 'No description',
           }));
+          // Sort by priority descending so new critical cases rise to the top
+          mapped.sort((a: any, b: any) => b.priority - a.priority);
           setCases(mapped);
-          setSelectedCase(mapped[0]);
+          if (isInitial) setSelectedCase(mapped[0]);
         }
       } catch (e) {
         // use mock
       } finally {
-        setLoading(false);
+        if (isInitial && mounted) setLoading(false);
       }
     }
-    fetchCases();
+
+    fetchCases(true);
+    // Poll every 5 seconds so demo scenario cases appear in real time
+    const interval = setInterval(() => fetchCases(false), 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -616,7 +592,24 @@ export default function Investigation() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="glass-card p-5 rounded-xl">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
+                    {limeLoading && (
+                      <span className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        ML computing...
+                      </span>
+                    )}
+                    {!limeLoading && mlLimeBars && (
+                      <span className="text-[10px] text-emerald-400">● Live ML</span>
+                    )}
+                    {!limeLoading && !mlLimeBars && (
+                      <span className="text-[10px]" style={{ color: 'var(--muted)' }}>● Baseline</span>
+                    )}
+                  </div>
                   <div className="w-full h-[180px] mt-3" key={`lime-${selectedCase.$id}`}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={mlLimeBars || limeBars} layout="vertical" margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>

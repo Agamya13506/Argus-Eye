@@ -465,12 +465,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           });
             console.log('Transaction created:', result);
 
-            // Force refresh transactions list immediately
-            const freshTx = await api.getTransactions();
-            if (Array.isArray(freshTx) && freshTx.length > 0) {
-              console.log(`[LiveFeed] Refreshed with ${freshTx.length} transactions, first:`, freshTx[0]?.sender);
-              setTransactions(freshTx);
-            }
+            // Optimistically prepend new transaction to UI immediately
+            // (don't re-fetch — the 8 seeded records will override the new one)
+            const newTx = {
+              sender: `user_${Math.floor(Math.random() * 9999)}`,
+              receiver: `merch_${Math.floor(Math.random() * 999)}`,
+              amount,
+              score,
+              type,
+              status,
+            };
+            setTransactions(prev => [newTx, ...prev].slice(0, 20));
 
             // Also create threat if score is high
             if (score > 60) {
@@ -512,20 +517,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     review: { bg: 'rgba(168,85,247,0.12)', text: '#c084fc' },
     clear: { bg: 'rgba(34,197,94,0.12)', text: '#4ade80' },
   };
-
-  // Force refresh transactions from backend periodically
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const txRes = await api.getTransactions();
-        if (Array.isArray(txRes) && txRes.length > 0) {
-          console.log(`[Polling] Got ${txRes.length} transactions, first:`, txRes[0]?.sender);
-          setTransactions(txRes);
-        }
-      } catch (e) { /* ignore */ }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <motion.div
@@ -783,131 +774,138 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </motion.div>
 
-      {/* Demo Alerts - Debug: {demoAlerts.length} alerts */}
-      {demoAlerts.length > 0 && (
-        <div className="fixed bottom-8 right-8 z-50 space-y-3 max-w-sm">
-          {demoAlerts.map((alert) => (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0, x: 100, scale: 0.9 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 100, scale: 0.9 }}
-              transition={{ type: 'spring', bounce: 0.3 }}
-              className="glass-card p-4 rounded-xl border-l-4"
-              style={{
-                borderLeftColor: alert.type === 'velocity' ? '#f97316' :
-                  alert.type === 'geo' ? '#f97316' :
+    </motion.div>
+
+    {/* Demo Alerts rendered outside motion.div to avoid stacking context trap */}
+    {demoAlerts.length > 0 && (
+      <div className="fixed bottom-8 right-8 z-[9999] space-y-3 max-w-sm pointer-events-auto">
+        {demoAlerts.map((alert) => (
+          <motion.div
+            key={alert.id}
+            initial={{ opacity: 0, x: 100, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.9 }}
+            transition={{ type: 'spring', bounce: 0.3 }}
+            className="glass-card p-4 rounded-xl border-l-4"
+            style={{
+              borderLeftColor: alert.type === 'velocity' ? '#f97316' :
+                alert.type === 'geo' ? '#f97316' :
+                  alert.type === 'sim' ? '#f43f5e' :
+                    alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
+              background: 'rgba(15,23,42,0.95)'
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle
+                className="w-5 h-5 flex-shrink-0 mt-0.5"
+                style={{
+                  color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' :
                     alert.type === 'sim' ? '#f43f5e' :
-                      alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
-                background: 'rgba(15,23,42,0.95)'
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <AlertTriangle
-                  className="w-5 h-5 flex-shrink-0 mt-0.5"
-                  style={{
-                    color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' :
-                      alert.type === 'sim' ? '#f43f5e' :
-                        alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
-                  }}
-                />
-                <div>
-                  <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
-                  <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
-                  <div className="text-[10px] font-mono mb-3 p-1.5 rounded bg-black/20 text-blue-400 inline-block">
-                    {alert.rbiRef}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
-                      onClick={async () => {
-                        console.log('BLOCK clicked for alert:', alert.id);
-                        try {
-                          // Create blocked transaction
-                          await api.createTransaction({
-                            sender: `demo_${alert.type}`,
-                            receiver: 'BLOCKED',
-                            amount: 0,
-                            score: 95,
-                            type: alert.title,
-                            status: 'blocked',
-                          });
-                          // Also create/update a threat
-                          await api.createThreat({
-                            entityId: `demo_${alert.type}`,
-                            entityType: 'UPI ID',
-                            source: 'ANALYST',
-                            reports: 1,
-                            score: 95,
-                            status: 'CONFIRMED',
-                            time: 'Just now'
-                          });
-                          console.log('Block completed successfully');
-                        } catch (e) { 
-                          console.error('Block error:', e); 
-                          alert('Failed to block: ' + e);
-                        }
-                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
-                      }}
-                    >
-                      Block
-                    </button>
-                    <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
-                      onClick={async () => {
-                        console.log('VERIFY clicked for alert:', alert.id);
-                        try {
-                          await api.createTransaction({
-                            sender: `demo_${alert.type}`,
-                            receiver: 'VERIFIED',
-                            amount: 0,
-                            score: 15,
-                            type: alert.title,
-                            status: 'clear',
-                          });
-                          console.log('Verify completed successfully');
-                        } catch (e) { 
-                          console.error('Verify error:', e);
-                          alert('Failed to verify: ' + e);
-                        }
-                        setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
-                      }}
-                    >
-                      Verify
-                    </button>
-                    <button
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
-                      onClick={() => {
-                        if (alert.type === 'circular') {
-                          onNavigate?.('/network');
-                          setTimeout(() => {
-                            window.dispatchEvent(new CustomEvent('highlightCycle', {
-                              detail: { nodes: ['user_44', 'user_8', 'user_89'] }
-                            }));
-                          }, 600);
-                        } else {
-                          const typeMap: Record<string, string> = {
-                            velocity: 'Card Testing',
-                            geo: 'Account Takeover',
-                            sim: 'SIM Swap',
-                            social: 'Phishing',
-                          };
+                      alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
+                }}
+              />
+              <div>
+                <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
+                <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
+                <div className="text-[10px] font-mono mb-3 p-1.5 rounded bg-black/20 text-blue-400 inline-block">
+                  {alert.rbiRef}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
+                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                    onClick={async () => {
+                      console.log('BLOCK clicked for alert:', alert.id);
+                      try {
+                        // Create blocked transaction
+                        await api.createTransaction({
+                          sender: `demo_${alert.type}`,
+                          receiver: 'BLOCKED',
+                          amount: 0,
+                          score: 95,
+                          type: alert.title,
+                          status: 'blocked',
+                        });
+                        // Also create/update a threat
+                        await api.createThreat({
+                          entityId: `demo_${alert.type}`,
+                          entityType: 'UPI ID',
+                          source: 'ANALYST',
+                          reports: 1,
+                          score: 95,
+                          status: 'CONFIRMED',
+                          time: 'Just now'
+                        });
+                        console.log('Block completed successfully');
+                      } catch (e) { 
+                        console.error('Block error:', e); 
+                        alert('Failed to block: ' + e);
+                      }
+                      setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                    }}
+                  >
+                    Block
+                  </button>
+                  <button
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                    onClick={async () => {
+                      console.log('VERIFY clicked for alert:', alert.id);
+                      try {
+                        await api.createTransaction({
+                          sender: `demo_${alert.type}`,
+                          receiver: 'VERIFIED',
+                          amount: 0,
+                          score: 15,
+                          type: alert.title,
+                          status: 'clear',
+                        });
+                        console.log('Verify completed successfully');
+                      } catch (e) { 
+                        console.error('Verify error:', e);
+                        alert('Failed to verify: ' + e);
+                      }
+                      setDemoAlerts(prev => prev.filter(a => a.id !== alert.id));
+                    }}
+                  >
+                    Verify
+                  </button>
+                  <button
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                    style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
+                    onClick={() => {
+                      if (alert.type === 'circular') {
+                        onNavigate?.('/network');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('highlightCycle', {
+                            detail: { nodes: ['user_44', 'user_8', 'user_89'] }
+                          }));
+                        }, 600);
+                      } else {
+                        const typeMap: Record<string, string> = {
+                          velocity: 'Card Testing',
+                          geo: 'Account Takeover',
+                          sim: 'SIM Swap',
+                          social: 'Phishing',
+                        };
+                        // Navigate first, then dispatch after Investigation has mounted
+                        onNavigate?.('/investigation');
+                        setTimeout(() => {
                           window.dispatchEvent(new CustomEvent('investigationSelect', {
                             detail: { caseType: typeMap[alert.type] || 'Suspicious' }
                           }));
-                          onNavigate?.('/investigation');
-                        }
-                      }}
-                    >
-                      Investigate →
-                    </button>
-                  </div>
+                        }, 400);
+                      }
+                    }}
+                  >
+                    Investigate →
+                  </button>
                 </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-    </motion.div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    )}
   );
 }
