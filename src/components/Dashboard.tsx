@@ -6,6 +6,7 @@ import {
   ArrowUpRight, DollarSign, Eye, Clock, Server, Cpu, Database, Wifi, Play, Square
 } from 'lucide-react';
 import api, { appwriteClient } from '../services/api';
+import { getMlHealth } from '../services/mlApi';
 
 const mockStats = {
   totalTransactions: 1245600,
@@ -53,6 +54,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     uptime_seconds: null as number | null,
     false_positive_rate: null as number | null,
   });
+  const [mlHealth, setMlHealth] = useState<{
+    ml_inference_ms: number | null;
+    model_loaded: boolean | null;
+  }>({ ml_inference_ms: null, model_loaded: null });
   const [demoMode, setDemoMode] = useState(false);
   const [demoAlerts, setDemoAlerts] = useState<Alert[]>([]);
   const [manualFire, setManualFire] = useState(false);
@@ -76,6 +81,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       try {
         const data = await api.health();
         setHealth({ ...data, api_latency_ms: Date.now() - t0 });
+
+        getMlHealth().then(mlData => {
+          if (mlData) {
+            setMlHealth({
+              ml_inference_ms: mlData.ml_inference_ms,
+              model_loaded: mlData.model_loaded,
+            });
+          }
+        });
       } catch (e) { }
     };
     poll();
@@ -119,7 +133,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const runDemoScenario = (scenario: string) => {
     const alertId = `alert-${Date.now()}`;
     let newAlert: Alert;
-    
+
     switch (scenario) {
       case 'velocity':
         newAlert = {
@@ -207,7 +221,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       default:
         return;
     }
-    
+
     setDemoAlerts(prev => [newAlert, ...prev].slice(0, 3));
     setTimeout(() => {
       setDemoAlerts(prev => prev.filter(a => a.id !== alertId));
@@ -217,7 +231,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const startDemo = () => {
     setDemoMode(true);
     setDemoAlerts([]);
-    
+
     setTimeout(() => runDemoScenario('velocity'), 5000);
     setTimeout(() => runDemoScenario('geo'), 15000);
     setTimeout(() => runDemoScenario('sim'), 28000);
@@ -262,6 +276,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <div className="flex items-center gap-8 px-4">
           {[
             { icon: Server, label: 'API:', val: health.api_latency_ms ? `${health.api_latency_ms}ms` : '...', ok: health.api_latency_ms !== null && health.api_latency_ms < 150 },
+            {
+              icon: Cpu,
+              label: 'ML Inference:',
+              val: mlHealth.ml_inference_ms ? `${Math.round(mlHealth.ml_inference_ms)}ms` : '...',
+              ok: mlHealth.model_loaded === true,
+            },
             { icon: Cpu, label: 'TPS:', val: health.tps ? health.tps.toLocaleString() : '...', ok: true },
             { icon: Activity, label: 'False Pos Rate:', val: health.false_positive_rate ? `${health.false_positive_rate}%` : '...', ok: true },
             { icon: Wifi, label: 'Uptime:', val: health.uptime_seconds ? formatUptime(health.uptime_seconds) : '...', ok: true },
@@ -275,10 +295,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             >
               <item.icon className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} />
               <span style={{ color: 'var(--muted)' }}>{item.label}</span>
-              <span className="font-bold" style={{ 
-                color: item.label.includes('API:') 
+              <span className="font-bold" style={{
+                color: item.label.includes('API:')
                   ? (item.ok ? '#4ade80' : health.api_latency_ms && health.api_latency_ms > 150 ? '#fb7185' : '#fbbf24')
-                  : '#4ade80' 
+                  : '#4ade80'
               }}>{item.val}</span>
             </motion.div>
           ))}
@@ -473,21 +493,21 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               transition={{ type: 'spring', bounce: 0.3 }}
               className="glass-card p-4 rounded-xl border-l-4"
               style={{
-                borderLeftColor: alert.type === 'velocity' ? '#f97316' : 
-                                alert.type === 'geo' ? '#f97316' : 
-                                alert.type === 'sim' ? '#f43f5e' : 
-                                alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
+                borderLeftColor: alert.type === 'velocity' ? '#f97316' :
+                  alert.type === 'geo' ? '#f97316' :
+                    alert.type === 'sim' ? '#f43f5e' :
+                      alert.type === 'circular' ? '#7c3aed' : '#f59e0b',
                 background: 'rgba(15,23,42,0.95)'
               }}
             >
               <div className="flex items-start gap-3">
-                <AlertTriangle 
-                  className="w-5 h-5 flex-shrink-0 mt-0.5" 
-                  style={{ 
-                    color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' : 
-                          alert.type === 'sim' ? '#f43f5e' : 
-                          alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
-                  }} 
+                <AlertTriangle
+                  className="w-5 h-5 flex-shrink-0 mt-0.5"
+                  style={{
+                    color: alert.type === 'velocity' || alert.type === 'geo' ? '#f97316' :
+                      alert.type === 'sim' ? '#f43f5e' :
+                        alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
+                  }}
                 />
                 <div>
                   <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>

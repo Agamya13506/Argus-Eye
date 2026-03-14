@@ -4,8 +4,14 @@ import { BarChart3, TrendingUp, PieChart as PieChartIcon, Calendar, Download } f
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import api from '../services/api';
 import FraudHeatmap from './FraudHeatmap';
+import { getForecast } from '../services/mlApi';
 
-const mockTimeline = [
+type TimelineRow = {
+  name: string; fraud: number; legit: number;
+  forecast?: number; forecastLower?: number; forecastUpper?: number;
+};
+
+const mockTimeline: TimelineRow[] = [
   { name: 'Mon', fraud: 4000, legit: 24000 },
   { name: 'Tue', fraud: 3000, legit: 13980 },
   { name: 'Wed', fraud: 2000, legit: 9800 },
@@ -27,8 +33,11 @@ const barColors = ['#f43f5e', '#f59e0b', '#fb7185', '#f43f5e', '#2dd4bf'];
 
 interface AnalyticsProps { onNavigate?: (tab: string) => void; key?: string; }
 export default function Analytics({ onNavigate }: AnalyticsProps) {
-  const [timelineData, setTimelineData] = useState(mockTimeline);
+  const [timelineData, setTimelineData] = useState<TimelineRow[]>(mockTimeline);
   const [dateRange, setDateRange] = useState('7d');
+  const [forecastData, setForecastData] = useState<
+    { name: string; forecast: number; lower: number; upper: number }[]
+  >([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -77,6 +86,32 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
   useEffect(() => {
     setTimelineData(EXTENDED_MOCK[dateRange] || EXTENDED_MOCK['7d']);
   }, [dateRange]);
+
+  useEffect(() => {
+    getForecast().then(data => {
+      if (!data || !Array.isArray(data) || data.length === 0) return;
+
+      // Merge forecast values into existing timelineData by index
+      // (both are 7 items — map positionally)
+      setTimelineData(prev => {
+        return prev.map((row, i) => ({
+          ...row,
+          forecast: data[i] ? Math.round(data[i].yhat) : undefined,
+          forecastLower: data[i] ? Math.round(data[i].yhat_lower) : undefined,
+          forecastUpper: data[i] ? Math.round(data[i].yhat_upper) : undefined,
+        }));
+      });
+
+      const mapped = data.map((row: any) => ({
+        name: new Date(row.ds).toLocaleDateString('en-IN',
+          { weekday: 'short', day: 'numeric' }),
+        forecast: Math.round(row.yhat),
+        lower: Math.round(row.yhat_lower),
+        upper: Math.round(row.yhat_upper),
+      }));
+      setForecastData(mapped);
+    });
+  }, []);
 
   const exportCSV = (data: typeof timelineData) => {
     const header = 'Period,Fraud,Legitimate\n';
@@ -141,10 +176,20 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="glass-panel rounded-2xl p-6 lg:col-span-2 h-[400px] flex flex-col"
         >
-          <h3 className="text-lg font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-            <TrendingUp className="w-5 h-5 text-rose-400" />
-            Fraud vs Legitimate Volume
-          </h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text)' }}>
+              <TrendingUp className="w-5 h-5 text-rose-400" />
+              Fraud vs Legitimate Volume
+            </h3>
+          </div>
+          {forecastData.length > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-6 border-t-2 border-dashed border-purple-400" />
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                7-day fraud forecast (Prophet)
+              </span>
+            </div>
+          )}
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>

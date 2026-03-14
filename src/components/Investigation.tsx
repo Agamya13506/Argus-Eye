@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Filter, AlertTriangle, Clock, ArrowRight, ShieldAlert, Activity, Loader2 } from 'lucide-react';
 import { Chart as ChartJS, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import api from '../services/api';
+import { getExplanation, getShap, getTimeline, getRecommendations } from '../services/mlApi';
 
 ChartJS.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -139,6 +140,15 @@ export default function Investigation() {
   const [kycLoading, setKycLoading] = useState(false);
   const [kycDone, setKycDone] = useState(false);
 
+  const [mlLimeBars, setMlLimeBars] = useState<
+    { label: string; width: string; color: string }[] | null
+  >(null);
+  const [corrections, setCorrections] = useState<
+    { txn_id: string; true_label: number }[]
+  >([]);
+  const [mlRecommendations, setMlRecommendations] = useState<any[]>([]);
+  const [mlTimeline, setMlTimeline] = useState<any[]>([]);
+
   const limeBars = LIME_BY_TYPE[selectedCase.type] || LIME_BY_TYPE['Suspicious'];
 
   useEffect(() => {
@@ -208,6 +218,25 @@ export default function Investigation() {
       });
 
       chartRef.current = chart;
+
+      getShap(selectedCase.id).then(shap => {
+        if (!shap || !chartRef.current) return;
+        const shapValues = [
+          Math.abs(shap.velocity || 0),
+          Math.abs(shap.device_risk || 0),
+          Math.abs(shap.time_risk || 0),
+          Math.abs(shap.amount_risk || 0),
+          Math.abs(shap.recipient || 0),
+          Math.abs(shap.network || 0),
+          Math.abs(shap.identity || 0),
+          Math.abs(shap.location || 0),
+        ];
+        const maxVal = Math.max(...shapValues, 0.01);
+        chartRef.current.data.datasets[0].data =
+          shapValues.map((v: number) => parseFloat((v / maxVal).toFixed(3)));
+        chartRef.current.update();
+      });
+
     } catch (e) {
       console.warn('ChartJS init error (non-fatal):', e);
     }
@@ -218,6 +247,33 @@ export default function Investigation() {
         chartRef.current = null;
       }
     };
+  }, [selectedCase.$id]);
+
+  useEffect(() => {
+    setMlLimeBars(null);
+
+    getExplanation(selectedCase.id).then(lime => {
+      if (lime && lime.length > 0) {
+        const bars = lime
+          .filter((r: any) => r.direction === 'RISK')
+          .map((r: any) => ({
+            label: r.feature.split(' ')[0].replace(/_/g, ' '),
+            width: `${Math.min(99, Math.max(5, r.weight * 8000))}%`,
+            color: r.weight > 0.005 ? '#f43f5e' : '#f59e0b',
+          }));
+        if (bars.length > 0) setMlLimeBars(bars);
+      }
+    });
+
+    getRecommendations(selectedCase.id).then(recs => {
+      if (recs && recs.length > 0) setMlRecommendations(recs);
+      else setMlRecommendations([]);
+    });
+
+    getTimeline(selectedCase.id).then(events => {
+      if (events && events.length > 0) setMlTimeline(events);
+      else setMlTimeline([]);
+    });
   }, [selectedCase.$id]);
 
   useEffect(() => {
@@ -492,11 +548,12 @@ export default function Investigation() {
                 <div className="glass-card p-5 rounded-xl">
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>LIME Explainability</h4>
                   <div className="w-full space-y-3 mt-3" key={selectedCase.$id}>
-                    {limeBars.map(bar => (
+                    {(mlLimeBars || limeBars).map(bar => (
                       <div key={bar.label} className="flex items-center gap-2">
                         <span className="text-xs w-24 text-right" style={{ color: 'var(--muted)' }}>{bar.label}</span>
                         <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                           <motion.div
+                            key={`${selectedCase.$id}-${bar.label}`}
                             initial={{ width: 0 }}
                             animate={{ width: bar.width }}
                             transition={{ duration: 1, delay: 0.5 }}
@@ -521,34 +578,72 @@ export default function Investigation() {
             <div className="glass-card p-5 rounded-xl mb-6">
               <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--muted)' }}>Recommended Actions</h4>
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                  <div>
-                    <div className="text-rose-400 font-medium text-sm">Freeze Account Immediately</div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>RBI Ref: {CASE_DETAILS[selectedCase.type]?.rbi || 'RBI/2021-22/56'}</div>
+                {(mlRecommendations.length > 0
+                  ? mlRecommendations
+                  : [
+                    {
+                      action: 'Freeze Account Immediately',
+                      urgency: 'HIGH',
+                      description: 'Prevent further unauthorized transactions',
+                      rbi_ref: CASE_DETAILS[selectedCase.type]?.rbi || 'RBI/2021-22/56'
+                    },
+                    {
+                      action: 'Request KYC Reverification',
+                      urgency: 'MEDIUM',
+                      description: 'Identity mismatch detected',
+                      rbi_ref: 'RBI/2020-21/44'
+                    },
+                  ]
+                ).map((rec: any, i: number) => (
+                  <div key={i}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${rec.urgency === 'HIGH'
+                      ? 'bg-rose-500/10 border-rose-500/20'
+                      : rec.urgency === 'MEDIUM'
+                        ? 'bg-amber-500/10 border-amber-500/20'
+                        : 'bg-blue-500/10 border-blue-500/20'
+                      }`}>
+                    <div>
+                      <div className={`font-medium text-sm ${rec.urgency === 'HIGH' ? 'text-rose-400' :
+                        rec.urgency === 'MEDIUM' ? 'text-amber-400' : 'text-blue-400'
+                        }`}>{rec.action}</div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                        RBI Ref: {rec.rbi_ref || rec.rbi}
+                      </div>
+                    </div>
+                    {rec.action.includes('KYC') ? (
+                      <button
+                        onClick={handleKYC}
+                        disabled={kycLoading || kycDone}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-medium
+                                   transition-colors flex items-center gap-2 min-w-[80px] justify-center
+                                   text-white ${rec.urgency === 'HIGH'
+                            ? 'bg-rose-500 hover:bg-rose-600 disabled:opacity-60'
+                            : rec.urgency === 'MEDIUM'
+                              ? 'bg-amber-500 hover:bg-amber-600 disabled:opacity-60'
+                              : 'bg-blue-500 hover:bg-blue-600 disabled:opacity-60'
+                          }`}
+                      >
+                        {kycLoading
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : kycDone
+                            ? '✓ Sent'
+                            : 'Execute'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={rec.urgency === 'HIGH' ? handleBlock : undefined}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-medium
+                                    text-white transition-colors ${rec.urgency === 'HIGH'
+                            ? 'bg-rose-500 hover:bg-rose-600'
+                            : rec.urgency === 'MEDIUM'
+                              ? 'bg-amber-500 hover:bg-amber-600'
+                              : 'bg-blue-500 hover:bg-blue-600'
+                          }`}>
+                        Execute
+                      </button>
+                    )}
                   </div>
-                  <button onClick={handleBlock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
-                    Execute
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <div>
-                    <div className="text-amber-400 font-medium text-sm">Request KYC Reverification</div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Identity mismatch detected</div>
-                  </div>
-                  <button
-                    onClick={handleKYC}
-                    disabled={kycLoading || kycDone}
-                    className="bg-amber-500 hover:bg-amber-600 disabled:opacity-60
-                               text-white px-4 py-1.5 rounded-lg text-sm font-medium
-                               transition-colors flex items-center gap-2 min-w-[80px] justify-center"
-                  >
-                    {kycLoading
-                      ? <Loader2 className="w-3 h-3 animate-spin" />
-                      : kycDone
-                        ? '✓ Sent'
-                        : 'Execute'}
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
 

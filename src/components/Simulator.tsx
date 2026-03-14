@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Play, Settings, ShieldAlert, CheckCircle2, RefreshCw, Zap, Target, TrendingUp, Database, Loader2 } from 'lucide-react';
 import api from '../services/api';
+import { scoreTransaction } from '../services/mlApi';
 
 const attackVectors = [
   { id: 'card_testing', name: 'Card Testing', description: 'Multiple small transactions to test valid cards', risk: 'High' },
@@ -27,20 +28,25 @@ export default function Simulator() {
   const [simProgress, setSimProgress] = useState(0);
   const [results, setResults] = useState<SimResult[]>([]);
   const [simLogs, setSimLogs] = useState<Array<{ id: number; time: string; status: string; score: number }>>([]);
+  const [mlScore, setMlScore] = useState<number | null>(null);
+  const [mlFraudType, setMlFraudType] = useState<string | null>(null);
+  const [mlRiskLevel, setMlRiskLevel] = useState<string | null>(null);
+  const [mlLime, setMlLime] = useState<any[]>([]);
+  const [currentTxnId, setCurrentTxnId] = useState<string>('');
 
   function getVectorScore(vectorId: string, iteration: number): number {
     const baseScores: Record<string, number> = {
-      card_testing:     88,
-      velocity:         91,
+      card_testing: 88,
+      velocity: 91,
       account_takeover: 94,
-      geo_imposter:     89,
-      mule:             82,
-      phishing:         86,
-      uco_bank:         96,
+      geo_imposter: 89,
+      mule: 82,
+      phishing: 86,
+      uco_bank: 96,
     };
     const base = baseScores[vectorId] || 85;
     const variance = (iteration % 3 === 0 ? -8 :
-                      iteration % 3 === 1 ? +4 : -2);
+      iteration % 3 === 1 ? +4 : -2);
     return Math.min(99, Math.max(60, base + variance));
   }
 
@@ -49,11 +55,25 @@ export default function Simulator() {
     setSimProgress(0);
     setSimLogs([]);
     setResults([]);
+    setMlScore(null);
+    setMlFraudType(null);
+    setMlRiskLevel(null);
+    setMlLime([]);
 
+    const txnId = `sim_${selectedVector}_${Date.now()}`;
+    setCurrentTxnId(txnId);
+
+    // Call real ML backend
+    const mlResult = await scoreTransaction(selectedVector, txnId);
+
+    // Animate logs using ML score as baseline
+    const baseScore = mlResult?.score ?? getVectorScore(selectedVector, 0);
     const logs: typeof simLogs = [];
     for (let i = 0; i < 8; i++) {
       await new Promise(r => setTimeout(r, 300));
-      const score = getVectorScore(selectedVector, i);
+      // Vary around the real ML score for visual realism
+      const variance = (i % 3 === 0 ? -8 : i % 3 === 1 ? +4 : -2);
+      const score = Math.min(99, Math.max(40, baseScore + variance));
       const status = score >= 75 ? 'BLOCKED' : score >= 40 ? 'FLAGGED' : 'PASSED';
       logs.push({
         id: 1000 + i + 1,
@@ -65,22 +85,29 @@ export default function Simulator() {
       setSimProgress(Math.min(100, Math.round(((i + 1) / 8) * 100)));
     }
 
-    const vectorName = attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
+    // Store ML results for display
+    if (mlResult) {
+      setMlScore(mlResult.score);
+      setMlFraudType(mlResult.fraud_type);
+      setMlRiskLevel(mlResult.risk_level);
+      setMlLime(mlResult.lime || []);
+    }
+
     const vectorStats: Record<string, { detection: number; block: number }> = {
-      card_testing:     { detection: 0.94, block: 0.97 },
-      velocity:         { detection: 0.96, block: 0.98 },
+      card_testing: { detection: 0.94, block: 0.97 },
+      velocity: { detection: 0.96, block: 0.98 },
       account_takeover: { detection: 0.91, block: 0.95 },
-      geo_imposter:     { detection: 0.93, block: 0.96 },
-      mule:             { detection: 0.88, block: 0.92 },
-      phishing:         { detection: 0.89, block: 0.93 },
-      uco_bank:         { detection: 0.97, block: 0.99 },
+      geo_imposter: { detection: 0.93, block: 0.96 },
+      mule: { detection: 0.88, block: 0.92 },
+      phishing: { detection: 0.89, block: 0.93 },
+      uco_bank: { detection: 0.97, block: 0.99 },
     };
     const stats = vectorStats[selectedVector] || { detection: 0.90, block: 0.94 };
     const total = 800 + Math.floor(selectedVector.length * 47);
     const detected = Math.floor(total * stats.detection);
     const blocked = Math.floor(detected * stats.block);
     const falsePos = Math.floor(total * 0.012);
-
+    const vectorName = attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
     setResults([{ vector: vectorName, total, detected, blocked, falsePos }]);
     setIsRunning(false);
   };
@@ -157,15 +184,15 @@ export default function Simulator() {
                 key={vector.id}
                 onClick={() => setSelectedVector(vector.id)}
                 className={`p-3 rounded-xl text-left transition-all ${selectedVector === vector.id
-                    ? 'bg-rose-500/10 border-2 border-rose-500/40'
-                    : 'glass-card hover:border-rose-500/20'
+                  ? 'bg-rose-500/10 border-2 border-rose-500/40'
+                  : 'glass-card hover:border-rose-500/20'
                   }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>{vector.name}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${vector.risk === 'Critical' ? 'bg-rose-500/15 text-rose-400' :
-                      vector.risk === 'High' ? 'bg-amber-500/15 text-amber-400' :
-                        'bg-rose-500/15 text-rose-400'
+                    vector.risk === 'High' ? 'bg-amber-500/15 text-amber-400' :
+                      'bg-rose-500/15 text-rose-400'
                     }`}>
                     {vector.risk}
                   </span>
@@ -186,11 +213,11 @@ export default function Simulator() {
                 UCO Bank IMPS Glitch — 2023
               </div>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                The 2023 UCO Bank IMPS glitch resulted in ₹820 crore being credited to 41,000 
-                accounts through ISO-8583 message mis-routing. The middleware used 
-                "Process-and-Check" logic — credits were applied before message field validation. 
-                When validation failed, the sender's bank received a refund but the receiver kept 
-                the money. This preset simulates that exact pattern. FraudShield detects it via 
+                The 2023 UCO Bank IMPS glitch resulted in ₹820 crore being credited to 41,000
+                accounts through ISO-8583 message mis-routing. The middleware used
+                "Process-and-Check" logic — credits were applied before message field validation.
+                When validation failed, the sender's bank received a refund but the receiver kept
+                the money. This preset simulates that exact pattern. FraudShield detects it via
                 Circular Fund Flow analysis and velocity rules.
               </p>
             </motion.div>
@@ -218,8 +245,8 @@ export default function Simulator() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${log.status === 'BLOCKED' ? 'bg-rose-500/15 text-rose-400' :
-                        log.status === 'FLAGGED' ? 'bg-amber-500/15 text-amber-400' :
-                          'bg-emerald-500/15 text-emerald-400'
+                      log.status === 'FLAGGED' ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-emerald-500/15 text-emerald-400'
                       }`}>{log.status}</span>
                     <span className="text-xs font-mono font-bold" style={{ color: 'var(--text)' }}>{log.score}</span>
                   </div>
@@ -283,6 +310,87 @@ export default function Simulator() {
           )}
         </motion.div>
       </div>
+
+      {mlScore !== null && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-panel rounded-2xl p-6 mb-8"
+        >
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2"
+            style={{ color: 'var(--text)' }}>
+            <ShieldAlert className="w-5 h-5 text-rose-400" />
+            ML Model Result
+            <span className="text-xs font-normal ml-2 px-2 py-0.5 rounded-full
+                             bg-emerald-500/15 text-emerald-400">
+              Real AI Score
+            </span>
+          </h3>
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <div className="text-xs uppercase tracking-wider mb-2"
+                style={{ color: 'var(--muted)' }}>Risk Score</div>
+              <div className="text-4xl font-bold"
+                style={{
+                  color: mlScore >= 75 ? '#f43f5e' :
+                    mlScore >= 40 ? '#fbbf24' : '#4ade80'
+                }}>
+                {mlScore.toFixed(1)}
+              </div>
+              <div className={`text-sm mt-1 font-medium ${mlRiskLevel === 'HIGH' ? 'text-rose-400' :
+                  mlRiskLevel === 'MEDIUM' ? 'text-amber-400' :
+                    'text-emerald-400'
+                }`}>{mlRiskLevel} RISK</div>
+              {mlFraudType && (
+                <div className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
+                  Type: <span style={{ color: 'var(--accent)' }}>
+                    {mlFraudType.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="col-span-2">
+              <div className="text-xs uppercase tracking-wider mb-3"
+                style={{ color: 'var(--muted)' }}>
+                LIME — Top Risk Factors
+              </div>
+              {mlLime.length > 0 ? (
+                <div className="space-y-3">
+                  {mlLime.slice(0, 4).map((r: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-xs w-36 truncate"
+                        style={{ color: 'var(--muted)' }}>
+                        {r.feature.split(' ')[0].replace(/_/g, ' ')}
+                      </span>
+                      <div className="flex-1 h-2 rounded-full overflow-hidden"
+                        style={{ background: 'var(--border)' }}>
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(99, r.weight * 8000)}%` }}
+                          transition={{ duration: 1, delay: i * 0.1 }}
+                          className="h-full rounded-full"
+                          style={{
+                            backgroundColor:
+                              r.weight > 0.005 ? '#f43f5e' : '#f59e0b'
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs w-12 text-right"
+                        style={{ color: 'var(--muted)' }}>
+                        {(r.weight * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                  No risk factors returned — model scored as LOW risk.
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Historical Performance & Rulesets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

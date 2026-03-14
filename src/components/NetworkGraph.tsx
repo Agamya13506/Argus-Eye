@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import { Network, Search, Filter, ZoomIn, ZoomOut, Maximize, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
+import { getNetworkGraph } from '../services/mlApi';
 
 interface GraphNode {
   id: string;
@@ -66,6 +67,41 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [cycleHighlight, setCycleHighlight] = useState<string[]>([]);
+  const [mlCycleDetected, setMlCycleDetected] = useState(false);
+
+  useEffect(() => {
+    getNetworkGraph('user_492').then(data => {
+      if (!data) return;
+
+      if (data.cycle_detected && data.cycle_path) {
+        setMlCycleDetected(true);
+        // Extract node IDs from cycle path
+        const cycleNodeIds = Array.from(new Set(
+          data.cycle_path.flatMap((e: any) => [e.source, e.target])
+        )) as string[];
+
+        // Only highlight nodes that exist in our hardcoded graph
+        const validIds = cycleNodeIds.filter(id =>
+          defaultNodes.some(n => n.id === id)
+        );
+
+        if (validIds.length > 0) {
+          setCycleHighlight(validIds);
+        } else {
+          // Fallback: use known cycle nodes from hardcoded graph
+          setCycleHighlight(['user_44', 'user_8', 'user_89']);
+        }
+
+        // Dispatch event so demo mode alert card works
+        window.dispatchEvent(new CustomEvent('highlightCycle', {
+          detail: {
+            nodes: validIds.length > 0 ? validIds :
+              ['user_44', 'user_8', 'user_89']
+          }
+        }));
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const handler = (e: CustomEvent) => {
@@ -292,9 +328,13 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
             <div>
-              <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>Circular Flow Detected</h4>
+              <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>
+                {mlCycleDetected ? 'ML: Circular Flow Confirmed' : 'Circular Flow Detected'}
+              </h4>
               <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
-                A money mule network of 14 nodes with circular fund movement identified.
+                {mlCycleDetected
+                  ? 'NetworkX cycle detection confirmed money mule ring.'
+                  : 'A money mule network of 14 nodes with circular fund movement identified.'}
               </p>
               <button
                 onClick={() => {
