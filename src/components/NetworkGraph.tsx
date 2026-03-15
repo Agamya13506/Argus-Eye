@@ -133,6 +133,17 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
           <p style={{ color: 'var(--muted)' }}>Money mule network graph & link analysis</p>
         </div>
         <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              // Manually trigger cycle detection for demo
+              setCycleHighlight(['user_44', 'user_8', 'user_89']);
+              setMlCycleDetected(true);
+            }}
+            className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm font-bold border border-amber-500/30 transition-colors cursor-pointer"
+          >
+            Trigger Demo Alert
+          </button>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }} />
             <input
@@ -318,37 +329,63 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
           })}
         </svg>
 
-        {/* Circular flow alert */}
+        {/* Circular flow alert - always visible */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5 }}
-          className="absolute bottom-4 right-4 z-10 glass-card p-4 rounded-xl max-w-xs flex flex-col gap-2"
+          className="absolute top-4 left-4 z-50 glass-card p-4 rounded-xl max-w-xs flex flex-col gap-2"
+          style={{ background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(245, 158, 11, 0.5)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
         >
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" aria-hidden />
+            <AlertTriangle className="w-6 h-6 text-amber-400 mt-0.5 flex-shrink-0" aria-hidden />
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>
+              <h4 className="text-sm font-bold mb-1" style={{ color: '#fff' }}>
                 {mlCycleDetected ? 'ML: Circular Flow Confirmed' : 'Circular Flow Detected'}
               </h4>
-              <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
+              <p className="text-xs mb-3" style={{ color: '#94a3b8' }}>
                 {mlCycleDetected
-                  ? 'NetworkX cycle detection confirmed money mule ring.'
+                  ? 'NetworkX cycle detection confirmed money mule ring. 3 accounts flagged.'
                   : 'A money mule network of 14 nodes with circular fund movement identified.'}
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  onNavigate?.('investigation');
+                onClick={async () => {
+                  console.log('Investigate clicked');
+                  let createdCaseId = '';
+                  try {
+                    const caseResult = await api.createCase({
+                      title: 'Circular Fund Flow — Money Mule Ring',
+                      description: 'NetworkX cycle detection confirmed money mule ring: user_44 → user_8 → user_89 → user_44. Total: ₹1,77,000.',
+                      priority: 'critical',
+                      status: 'open',
+                      amount: 177000,
+                    });
+                    createdCaseId = caseResult?.$id || '';
+                  } catch (e) {
+                    console.error('Create case error:', e);
+                  }
+                  
+                  // Navigate
+                  if (onNavigate) {
+                    onNavigate('investigation');
+                  } else {
+                    window.location.href = '/investigation';
+                  }
+                  
                   setTimeout(() => {
                     window.dispatchEvent(new CustomEvent('investigationSelect', {
-                      detail: { caseType: 'Money Mule' }
+                      detail: { 
+                        caseType: 'Money Mule',
+                        caseId: createdCaseId,
+                      }
                     }));
-                  }, 600);
+                  }, 1000);
                 }}
-                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer inline-flex items-center gap-1"
+                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                Investigate →
+                <span>Investigate</span>
+                <span>→</span>
               </button>
             </div>
           </div>

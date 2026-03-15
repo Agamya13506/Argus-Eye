@@ -436,6 +436,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       console.log('Starting live feed interval...');
       interval = setInterval(async () => {
         console.log('Live feed interval running...');
+        if (!liveFeedActiveRef.current) return;
         // Generate random realistic transaction parameters
         const isFraud = Math.random() > 0.7; // 30% fraud rate
         const amount = isFraud ? Math.floor(Math.random() * 95000) + 5000 : Math.floor(Math.random() * 5000) + 100;
@@ -522,7 +523,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         } catch (e) {
           console.error("Live feed error:", e);
         }
-      }, 8000);
+      }, 3000);
     } else {
       console.log('Live feed NOT active, not starting interval');
     }
@@ -940,36 +941,53 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     </button>
                     <button
                       type="button"
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/30 text-amber-300 hover:bg-amber-500/40 transition-colors cursor-pointer border border-amber-500/40"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {
+                        console.log('Dashboard Investigate clicked for:', alert.type);
                         if (alert.type === 'circular') {
-                          onNavigate?.('network');
+                          try {
+                            await api.createCase({
+                              title: alert.caseTitle,
+                              description: `${alert.description} Circular fund flow detected - money mule ring.`,
+                              priority: 'critical',
+                              status: 'open',
+                              amount: alert.amount,
+                            });
+                          } catch (e) {}
+                          
+                          if (onNavigate) {
+                            onNavigate('network');
+                          } else {
+                            window.location.href = '/network';
+                          }
                           setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('highlightCycle', {
                               detail: { nodes: ['user_44', 'user_8', 'user_89'] }
                             }));
                           }, 600);
                         } else {
-                          // 1. Create the case in backend first
                           let createdCaseId = '';
                           try {
                             const caseResult = await api.createCase({
                               title: alert.caseTitle,
-                              description: `${alert.description} Pending investigation.`,
+                              description: `${alert.description} Pending investigation. ML Score should be calculated. Priority is critical due to fraud detection.`,
                               priority: 'critical',
                               status: 'open',
                               amount: alert.amount,
                             });
                             createdCaseId = caseResult?.$id || '';
+                            console.log('Dashboard case created:', createdCaseId);
                           } catch (e) {
                             console.error('Create case for investigate error:', e);
                           }
 
-                          // 2. Navigate to investigation
-                          onNavigate?.('investigation');
+                          if (onNavigate) {
+                            onNavigate('investigation');
+                          } else {
+                            window.location.href = '/investigation';
+                          }
 
-                          // 3. Dispatch event with both type and caseId
                           const typeMap: Record<string, string> = {
                             velocity: 'Card Testing',
                             geo: 'Account Takeover',
@@ -984,9 +1002,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 caseTitle: alert.caseTitle,
                               }
                             }));
-                          }, 800);
+                          }, 1000);
                         }
-                        // Keep the alert visible so user can still block/verify after investigating
                       }}
                     >
                       Investigate →

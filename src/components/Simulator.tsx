@@ -42,16 +42,45 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
   const [customParams, setCustomParams] = useState({
     amount_inr: 5000,
     hour: 14,
-    city_risk_score: 0.5,
-    is_new_device: 1,
-    category: 'cat_electronics',
-    velocity_60s: 5,
+    city_risk_score: 0.3,
+    is_new_device: 0,
+    category: 'cat_grocery',
+    velocity_60s: 2,
   });
+
+  // Calculate preview score in real-time
+  const previewScore = (() => {
+    let score = 0;
+    score += Math.min(30, customParams.amount_inr / 5000);
+    if (customParams.hour >= 0 && customParams.hour < 6) score += 20;
+    else if (customParams.hour >= 22 || customParams.hour < 5) score += 15;
+    score += Math.min(25, customParams.velocity_60s * 2);
+    if (customParams.is_new_device === 1) score += 15;
+    score += customParams.city_risk_score * 10;
+    return Math.min(99, Math.round(score));
+  })();
 
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
   let chartInstance: ChartJS | null = null;
 
   function getVectorScore(vectorId: string): number {
+    // Calculate score based on actual parameters for custom attack
+    if (vectorId === 'custom') {
+      let score = 0;
+      // Amount contributes up to 30 points (higher amount = higher risk)
+      score += Math.min(30, customParams.amount_inr / 5000);
+      // Hour contributes up to 20 points (night hours = higher risk)
+      if (customParams.hour >= 0 && customParams.hour < 6) score += 20;
+      else if (customParams.hour >= 22 || customParams.hour < 5) score += 15;
+      // Velocity contributes up to 25 points
+      score += Math.min(25, customParams.velocity_60s * 2);
+      // New device contributes 15 points
+      if (customParams.is_new_device === 1) score += 15;
+      // City risk contributes up to 10 points
+      score += customParams.city_risk_score * 10;
+      return Math.min(99, Math.round(score));
+    }
+    
     const baseScores: Record<string, number> = {
       obvious_fraud: 92,
       borderline: 58,
@@ -82,7 +111,10 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
     setCurrentTxnId(txnId);
 
     let customPayload = undefined;
+    let customVectorName = '';
+    
     if (selectedVector === 'custom') {
+      customVectorName = `Custom Attack (₹${customParams.amount_inr.toLocaleString()}, ${customParams.hour}:00, ${customParams.category.replace('cat_', '')})`;
       customPayload = {
         amount_inr: customParams.amount_inr,
         amount_scaled: customParams.amount_inr / 20000,
@@ -90,7 +122,7 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
         velocity_60s: customParams.velocity_60s,
         is_new_device: customParams.is_new_device,
         is_new_recipient: 1,
-        account_age_days: 10,
+        account_age_days: customParams.is_new_device ? 10 : 365,
         city_risk_score: customParams.city_risk_score,
         is_festival_day: 0,
         is_sim_swap_signal: customParams.is_new_device,
@@ -99,14 +131,18 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
         cat_grocery: customParams.category === 'cat_grocery' ? 1 : 0,
         cat_electronics: customParams.category === 'cat_electronics' ? 1 : 0,
         cat_travel: customParams.category === 'cat_travel' ? 1 : 0,
-        V14: -10.0, V4: 4.0, V12: -8.0, V10: -6.0, V11: -3.0,
+        V14: customParams.city_risk_score > 0.6 ? -20.0 : -5.0,
+        V4: customParams.is_new_device ? 6.0 : 1.0,
+        V12: customParams.city_risk_score > 0.6 ? -15.0 : -3.0,
+        V10: customParams.velocity_60s > 10 ? -12.0 : -2.0,
+        V11: customParams.velocity_60s > 10 ? -6.0 : -1.0,
       };
     }
 
     // Call real ML backend
     const mlResult = await scoreTransaction(selectedVector, txnId, customPayload);
 
-    // Animate logs using ML score as baseline
+    // Calculate base score - use custom params for custom attack
     const baseScore = mlResult?.score ?? getVectorScore(selectedVector);
     const logs: typeof simLogs = [];
 
@@ -163,7 +199,7 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
     const detected = logs.filter(l => l.status !== 'PASSED').length;
     const blocked = logs.filter(l => l.status === 'BLOCKED').length;
     const falsePos = 0; // True false positives require ground truth — honest zero
-    const vectorName = attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
+    const vectorName = customVectorName || attackVectors.find(v => v.id === selectedVector)?.name || selectedVector;
     setResults([{ vector: vectorName, total, detected, blocked, falsePos }]);
     setIsRunning(false);
   };
@@ -266,34 +302,92 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               className="glass-card p-4 rounded-xl mb-4 flex-shrink-0 w-full min-w-0 overflow-visible"
+              style={{ background: 'rgba(30, 30, 40, 0.8)', border: '1px solid rgba(244, 63, 94, 0.3)' }}
             >
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-2">
+                  <Settings className="w-3 h-3" /> Configure Custom Attack
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: '#94a3b8' }}>Preview Score:</span>
+                  <span 
+                    className="text-sm font-bold px-2 py-0.5 rounded"
+                    style={{ 
+                      background: previewScore >= 75 ? 'rgba(244,63,94,0.3)' : previewScore >= 40 ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)',
+                      color: previewScore >= 75 ? '#f43f5e' : previewScore >= 40 ? '#fbbf24' : '#22c55e'
+                    }}
+                  >
+                    {previewScore}
+                  </span>
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Amount (₹)</label>
-                  <input type="number" className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.amount_inr} onChange={e => setCustomParams(prev => ({ ...prev, amount_inr: Number(e.target.value) || 0 }))} style={{ borderColor: 'var(--border)' }} />
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-text"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.amount_inr} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, amount_inr: Number(e.target.value) || 0 }))} 
+                  />
                 </div>
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Hour (0-23)</label>
-                  <input type="number" min={0} max={23} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.hour} onChange={e => setCustomParams(prev => ({ ...prev, hour: Math.min(23, Math.max(0, Number(e.target.value) || 0)) }))} style={{ borderColor: 'var(--border)' }} />
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>Hour (0-23)</label>
+                  <input 
+                    type="number" 
+                    min={0} 
+                    max={23} 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-text"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.hour} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, hour: Math.min(23, Math.max(0, Number(e.target.value) || 0)) }))} 
+                  />
                 </div>
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>City Risk (0-1)</label>
-                  <input type="number" step="0.1" min={0} max={1} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.city_risk_score} onChange={e => setCustomParams(prev => ({ ...prev, city_risk_score: Math.min(1, Math.max(0, Number(e.target.value) || 0)) }))} style={{ borderColor: 'var(--border)' }} />
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>City Risk (0-1)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min={0} 
+                    max={1} 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-text"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.city_risk_score} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, city_risk_score: Math.min(1, Math.max(0, Number(e.target.value) || 0)) }))} 
+                  />
                 </div>
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Velocity (past 60s)</label>
-                  <input type="number" min={0} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.velocity_60s} onChange={e => setCustomParams(prev => ({ ...prev, velocity_60s: Math.max(0, Number(e.target.value) || 0) }))} style={{ borderColor: 'var(--border)' }} />
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>Velocity (txns/min)</label>
+                  <input 
+                    type="number" 
+                    min={0} 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-text"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.velocity_60s} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, velocity_60s: Math.max(0, Number(e.target.value) || 0) }))} 
+                  />
                 </div>
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Device</label>
-                  <select className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.is_new_device} onChange={e => setCustomParams(prev => ({ ...prev, is_new_device: Number(e.target.value) }))} style={{ borderColor: 'var(--border)' }}>
-                    <option value={0}>Known</option>
-                    <option value={1}>New</option>
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>Device</label>
+                  <select 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-pointer"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.is_new_device} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, is_new_device: Number(e.target.value) }))}
+                  >
+                    <option value={0}>Known Device</option>
+                    <option value={1}>New Device</option>
                   </select>
                 </div>
                 <div className="min-w-0">
-                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Category</label>
-                  <select className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.category} onChange={e => setCustomParams(prev => ({ ...prev, category: e.target.value }))} style={{ borderColor: 'var(--border)' }}>
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: '#94a3b8' }}>Category</label>
+                  <select 
+                    className="w-full min-w-0 bg-slate-900 border border-slate-500 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/30 transition-all cursor-pointer"
+                    style={{ boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
+                    value={customParams.category} 
+                    onChange={e => setCustomParams(prev => ({ ...prev, category: e.target.value }))}
+                  >
                     <option value="cat_electronics">Electronics</option>
                     <option value="cat_crypto">Crypto</option>
                     <option value="cat_grocery">Grocery</option>
@@ -460,13 +554,43 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
               )}
 
               <button
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('investigationSelect', {
-                    detail: { caseType: mlFraudType?.replace(/_/g, ' ') || 'Suspicious' }
-                  }));
-                  onNavigate?.('investigation');
+                onClick={async () => {
+                  console.log('Simulator Investigate clicked');
+                  // Create case in backend
+                  let createdCaseId = '';
+                  try {
+                    const caseResult = await api.createCase({
+                      title: `Simulator: ${mlFraudType?.replace(/_/g, ' ') || 'Custom Attack'}`,
+                      description: `ML Score: ${mlScore?.toFixed(1) || 'N/A'}. Risk Level: ${mlRiskLevel || 'Unknown'}. Fraud Type: ${mlFraudType?.replace(/_/g, ' ') || 'Custom'}. Parameters: Amount ₹${customParams.amount_inr}, Hour ${customParams.hour}, Velocity ${customParams.velocity_60s}, Device: ${customParams.is_new_device ? 'New' : 'Known'}, Category: ${customParams.category.replace('cat_', '')}.`,
+                      priority: mlScore && mlScore >= 75 ? 'critical' : 'high',
+                      status: 'open',
+                      amount: customParams.amount_inr || 0,
+                    });
+                    createdCaseId = caseResult?.$id || '';
+                    console.log('Simulator case created:', createdCaseId);
+                  } catch (e) {
+                    console.error('Create case for simulator error:', e);
+                  }
+                  
+                  // Navigate to investigation
+                  if (onNavigate) {
+                    onNavigate('investigation');
+                  } else {
+                    window.location.href = '/investigation';
+                  }
+                  
+                  // Dispatch event
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('investigationSelect', {
+                      detail: { 
+                        caseType: mlFraudType?.replace(/_/g, ' ') || 'Suspicious',
+                        caseId: createdCaseId,
+                        caseTitle: `Simulator: ${mlFraudType?.replace(/_/g, ' ') || 'Custom Attack'}`,
+                      }
+                    }));
+                  }, 1000);
                 }}
-                className="mt-6 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition-all w-full flex items-center justify-between group border border-rose-500/20"
+                className="mt-6 px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-xl text-sm font-bold transition-all w-full flex items-center justify-between group border border-rose-500/40"
               >
                 <span>Investigate Transaction</span>
                 <span className="group-hover:translate-x-1 transition-transform">→</span>

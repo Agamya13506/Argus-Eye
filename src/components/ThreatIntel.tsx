@@ -72,17 +72,13 @@ export default function ThreatIntel() {
 
   const handleConfirm = async (id: string) => {
     setProcessingId(id);
-    const prev = threats.find((t: any) => t.$id === id);
-    setThreats((prev: any[]) => prev.map((t: any) =>
+    setThreats((current: any[]) => current.map((t: any) =>
       t.$id === id ? { ...t, status: 'CONFIRMED' } : t
     ));
     try {
-      if (api.confirmThreat) {
-        await api.confirmThreat(id);
-      }
+      if (api.confirmThreat) await api.confirmThreat(id);
     } catch (e) {
-      // Offline fallback: keep the optimistic update in the UI for the demo
-      console.warn('ThreatIntel offline mock update (Confirm)');
+      console.warn('Confirm failed — optimistic update retained for demo');
     } finally {
       setProcessingId(null);
     }
@@ -90,16 +86,13 @@ export default function ThreatIntel() {
 
   const handleBlocklist = async (id: string) => {
     setProcessingId(id);
-    const prev = threats.find((t: any) => t.$id === id);
-    setThreats((prev: any[]) => prev.map((t: any) =>
+    setThreats((current: any[]) => current.map((t: any) =>
       t.$id === id ? { ...t, status: 'BLOCKLISTED' } : t
     ));
     try {
-      if (api.blocklistThreat) {
-        await api.blocklistThreat(id);
-      }
+      if (api.blocklistThreat) await api.blocklistThreat(id);
     } catch (e) {
-      console.warn('ThreatIntel offline mock update (Blocklist)');
+      console.warn('Blocklist failed — optimistic update retained for demo');
     } finally {
       setProcessingId(null);
     }
@@ -107,15 +100,11 @@ export default function ThreatIntel() {
 
   const handleDismiss = async (id: string) => {
     setProcessingId(id);
-    const prev = threats.find((t: any) => t.$id === id);
-    const prevThreats = [...threats];
-    setThreats((prev: any[]) => prev.filter((t: any) => t.$id !== id));
+    setThreats((current: any[]) => current.filter((t: any) => t.$id !== id));
     try {
-      if (api.dismissThreat) {
-        await api.dismissThreat(id);
-      }
+      if (api.dismissThreat) await api.dismissThreat(id);
     } catch (e) {
-      console.warn('ThreatIntel offline mock update (Dismiss)');
+      console.warn('Dismiss failed — optimistic update retained for demo');
     } finally {
       setProcessingId(null);
     }
@@ -272,8 +261,9 @@ export default function ThreatIntel() {
                     type="button"
                     onClick={() => handleConfirm(threat.$id)}
                     disabled={processingId === threat.$id}
-                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                    className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-all disabled:opacity-50 cursor-pointer border border-emerald-500/30 hover:border-emerald-400"
                     title="Confirm Threat"
+                    style={{ zIndex: 10, position: 'relative' }}
                   >
                     {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   </button>
@@ -282,8 +272,9 @@ export default function ThreatIntel() {
                   type="button"
                   onClick={() => handleBlocklist(threat.$id)}
                   disabled={processingId === threat.$id}
-                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  className="p-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-lg transition-all disabled:opacity-50 cursor-pointer border border-rose-500/30 hover:border-rose-400"
                   title="Blocklist"
+                  style={{ zIndex: 10, position: 'relative' }}
                 >
                   {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
                 </button>
@@ -291,8 +282,9 @@ export default function ThreatIntel() {
                   type="button"
                   onClick={() => handleDismiss(threat.$id)}
                   disabled={processingId === threat.$id}
-                  className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  className="p-2 bg-slate-500/20 hover:bg-slate-500/30 text-slate-400 rounded-lg transition-all disabled:opacity-50 cursor-pointer border border-slate-500/30 hover:border-slate-400"
                   title="Dismiss"
+                  style={{ zIndex: 10, position: 'relative' }}
                 >
                   {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                 </button>
