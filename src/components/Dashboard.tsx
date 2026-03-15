@@ -828,7 +828,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 background: 'rgba(15,23,42,0.95)'
               }}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 min-w-0">
                 <AlertTriangle
                   className="w-5 h-5 flex-shrink-0 mt-0.5"
                   style={{
@@ -837,14 +837,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                         alert.type === 'circular' ? '#7c3aed' : '#f59e0b'
                   }}
                 />
-                <div>
+                <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>{alert.title}</h4>
                   <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>{alert.description}</p>
                   <div className="text-[10px] font-mono mb-3 p-1.5 rounded bg-black/20 text-blue-400 inline-block">
                     {alert.rbiRef}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <button
+                      type="button"
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {
@@ -903,6 +904,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       ⛔ Block
                     </button>
                     <button
+                      type="button"
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {
@@ -937,6 +939,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       ✓ Approve
                     </button>
                     <button
+                      type="button"
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
                       style={{ pointerEvents: 'auto', position: 'relative', zIndex: 9999 }}
                       onClick={async () => {

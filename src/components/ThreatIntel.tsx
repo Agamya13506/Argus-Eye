@@ -196,11 +196,10 @@ export default function ThreatIntel() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.1 + idx * 0.08 }}
-            whileHover={{ x: 4 }}
-            className="glass-card p-4 rounded-xl transition-all flex flex-col md:flex-row items-start md:items-center justify-between group gap-4 md:gap-0"
+            className="glass-card p-4 rounded-xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
           >
-            <div className="flex items-center gap-4">
-              <div className="relative">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <div className="relative flex-shrink-0">
                 {threat.status === 'CONFIRMED' || threat.status === 'BLOCKLISTED' ? (
                   <ShieldAlert className="w-8 h-8 text-rose-400" />
                 ) : threat.status === 'CORROBORATED' ? (
@@ -215,8 +214,8 @@ export default function ThreatIntel() {
                 )}
               </div>
 
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-bold font-mono" style={{ color: 'var(--text)' }}>{threat.entityId}</h3>
                   <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5" style={{ color: 'var(--muted)' }}>
                     {threat.entityType}
@@ -245,7 +244,7 @@ export default function ThreatIntel() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+            <div className="flex items-center gap-3 flex-shrink-0 flex-wrap sm:flex-nowrap">
               <div style={{ width: '68px' }} className="flex-shrink-0">
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>Score</div>
                 <div className="text-lg font-bold whitespace-nowrap" style={{
@@ -267,29 +266,32 @@ export default function ThreatIntel() {
                 </div>
               </div>
 
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-2 items-center">
                 {threat.status !== 'CONFIRMED' && threat.status !== 'BLOCKLISTED' && (
                   <button
+                    type="button"
                     onClick={() => handleConfirm(threat.$id)}
                     disabled={processingId === threat.$id}
-                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50"
+                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                     title="Confirm Threat"
                   >
                     {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={() => handleBlocklist(threat.$id)}
                   disabled={processingId === threat.$id}
-                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50"
+                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                   title="Blocklist"
                 >
                   {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleDismiss(threat.$id)}
                   disabled={processingId === threat.$id}
-                  className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50"
+                  className="p-2 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                   title="Dismiss"
                 >
                   {processingId === threat.$id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}

@@ -53,15 +53,19 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
 
   function getVectorScore(vectorId: string): number {
     const baseScores: Record<string, number> = {
+      obvious_fraud: 92,
+      borderline: 58,
+      legitimate: 12,
+      uco_bank: 96,
+      custom: 50,
       card_testing: 88,
       velocity: 91,
       account_takeover: 94,
       geo_imposter: 89,
       mule: 82,
       phishing: 86,
-      uco_bank: 96,
     };
-    return baseScores[vectorId] || 85;
+    return baseScores[vectorId] ?? 85;
   }
 
   const startSimulation = async () => {
@@ -125,9 +129,10 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
       await new Promise(r => setTimeout(r, 350));
     }
 
-    // Store ML results for display
+    // Store ML results for display (always show a score: from ML or fallback)
+    const displayScore = mlResult?.score ?? baseScore;
+    setMlScore(displayScore);
     if (mlResult) {
-      setMlScore(mlResult.score);
       setMlFraudType(mlResult.fraud_type);
       setMlRiskLevel(mlResult.risk_level);
 
@@ -148,6 +153,9 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
         type: mlResult.fraud_type?.replace(/_/g, ' ') || 'Unknown',
         status: mlResult.score >= 75 ? 'blocked' : mlResult.score >= 40 ? 'flagged' : 'clear'
       }).catch(() => { });
+    } else {
+      setMlFraudType(null);
+      setMlRiskLevel(displayScore >= 75 ? 'HIGH' : displayScore >= 40 ? 'MEDIUM' : 'LOW');
     }
 
     // Derive stats from actual ML log results — no hardcoding
@@ -194,16 +202,18 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
         </div>
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={startSimulation}
             disabled={isRunning}
-            className="btn-accent flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-accent flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             {isRunning ? 'Running...' : 'Run Simulation'}
           </button>
           <button
+            type="button"
             onClick={resetSimulation}
-            className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5"
+            className="px-4 py-2 rounded-xl glass-card flex items-center gap-2 text-sm font-medium transition-colors hover:bg-white/5 cursor-pointer"
             style={{ color: 'var(--muted)' }}
           >
             <RefreshCw className="w-4 h-4" /> Reset
@@ -217,18 +227,19 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="glass-panel rounded-2xl p-6 lg:col-span-2 h-[420px] flex flex-col"
+          className="glass-panel rounded-2xl p-6 lg:col-span-2 min-h-[420px] flex flex-col overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text)' }}>
               <Target className="w-5 h-5 text-rose-400" />
               Attack Vectors
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4 flex-shrink-0">
             {attackVectors.map((vector) => (
               <button
+                type="button"
                 key={vector.id}
                 onClick={() => setSelectedVector(vector.id)}
                 className={`p-3 rounded-xl text-left transition-all ${selectedVector === vector.id
@@ -254,39 +265,41 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="glass-card p-4 rounded-xl mb-4 grid grid-cols-2 md:grid-cols-3 gap-4"
+              className="glass-card p-4 rounded-xl mb-4 flex-shrink-0 w-full min-w-0 overflow-visible"
             >
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Amount (₹)</label>
-                <input type="number" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.amount_inr} onChange={e => setCustomParams({ ...customParams, amount_inr: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Hour (0-23)</label>
-                <input type="number" min="0" max="23" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.hour} onChange={e => setCustomParams({ ...customParams, hour: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>City Risk (0-1)</label>
-                <input type="number" step="0.1" min="0" max="1" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.city_risk_score} onChange={e => setCustomParams({ ...customParams, city_risk_score: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Velocity (past 60s)</label>
-                <input type="number" className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.velocity_60s} onChange={e => setCustomParams({ ...customParams, velocity_60s: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }} />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Device</label>
-                <select className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.is_new_device} onChange={e => setCustomParams({ ...customParams, is_new_device: Number(e.target.value) })} style={{ borderColor: 'var(--border)' }}>
-                  <option value={0}>Known</option>
-                  <option value={1}>New</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Category</label>
-                <select className="w-full bg-black/20 border rounded p-1.5 text-xs text-white" value={customParams.category} onChange={e => setCustomParams({ ...customParams, category: e.target.value })} style={{ borderColor: 'var(--border)' }}>
-                  <option value="cat_electronics">Electronics</option>
-                  <option value="cat_crypto">Crypto</option>
-                  <option value="cat_grocery">Grocery</option>
-                  <option value="cat_travel">Travel</option>
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Amount (₹)</label>
+                  <input type="number" className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.amount_inr} onChange={e => setCustomParams(prev => ({ ...prev, amount_inr: Number(e.target.value) || 0 }))} style={{ borderColor: 'var(--border)' }} />
+                </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Hour (0-23)</label>
+                  <input type="number" min={0} max={23} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.hour} onChange={e => setCustomParams(prev => ({ ...prev, hour: Math.min(23, Math.max(0, Number(e.target.value) || 0)) }))} style={{ borderColor: 'var(--border)' }} />
+                </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>City Risk (0-1)</label>
+                  <input type="number" step="0.1" min={0} max={1} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.city_risk_score} onChange={e => setCustomParams(prev => ({ ...prev, city_risk_score: Math.min(1, Math.max(0, Number(e.target.value) || 0)) }))} style={{ borderColor: 'var(--border)' }} />
+                </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Velocity (past 60s)</label>
+                  <input type="number" min={0} className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.velocity_60s} onChange={e => setCustomParams(prev => ({ ...prev, velocity_60s: Math.max(0, Number(e.target.value) || 0) }))} style={{ borderColor: 'var(--border)' }} />
+                </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Device</label>
+                  <select className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.is_new_device} onChange={e => setCustomParams(prev => ({ ...prev, is_new_device: Number(e.target.value) }))} style={{ borderColor: 'var(--border)' }}>
+                    <option value={0}>Known</option>
+                    <option value={1}>New</option>
+                  </select>
+                </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] uppercase font-bold tracking-wider mb-1 block" style={{ color: 'var(--muted)' }}>Category</label>
+                  <select className="w-full min-w-0 bg-black/20 border rounded p-2 text-sm text-white" value={customParams.category} onChange={e => setCustomParams(prev => ({ ...prev, category: e.target.value }))} style={{ borderColor: 'var(--border)' }}>
+                    <option value="cat_electronics">Electronics</option>
+                    <option value="cat_crypto">Crypto</option>
+                    <option value="cat_grocery">Grocery</option>
+                    <option value="cat_travel">Travel</option>
+                  </select>
+                </div>
               </div>
             </motion.div>
           )}
@@ -350,7 +363,7 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="glass-panel rounded-2xl p-6 h-[420px] flex flex-col"
+          className="glass-panel rounded-2xl p-6 min-h-[420px] flex flex-col"
         >
           <h3 className="text-lg font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--text)' }}>
             <ShieldAlert className="w-5 h-5 text-rose-400" />
@@ -379,6 +392,14 @@ export default function Simulator({ onNavigate }: { onNavigate?: (tab: string) =
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               {simProgress === 0 ? 'Ready to start' : simProgress < 100 ? 'In progress...' : 'Complete'}
             </p>
+            {simProgress === 100 && mlScore !== null && (
+              <div className="mt-3 w-full glass-card p-3 rounded-xl text-center">
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>ML Score</div>
+                <div className="text-2xl font-bold" style={{ color: mlScore >= 75 ? '#f43f5e' : mlScore >= 40 ? '#fbbf24' : '#4ade80' }}>
+                  {mlScore.toFixed(1)}
+                </div>
+              </div>
+            )}
           </div>
 
           {simProgress === 100 && results.length > 0 && (

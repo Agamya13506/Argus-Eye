@@ -323,30 +323,30 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5 }}
-          className="absolute bottom-4 right-4 z-10 glass-card p-4 rounded-xl max-w-xs"
+          className="absolute bottom-4 right-4 z-10 glass-card p-4 rounded-xl max-w-xs flex flex-col gap-2"
         >
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
-            <div>
+            <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
               <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>
                 {mlCycleDetected ? 'ML: Circular Flow Confirmed' : 'Circular Flow Detected'}
               </h4>
-              <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+              <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
                 {mlCycleDetected
                   ? 'NetworkX cycle detection confirmed money mule ring.'
                   : 'A money mule network of 14 nodes with circular fund movement identified.'}
               </p>
               <button
+                type="button"
                 onClick={() => {
                   onNavigate?.('investigation');
-                  // Delay event dispatch so Investigation has time to mount and register its listener
                   setTimeout(() => {
                     window.dispatchEvent(new CustomEvent('investigationSelect', {
                       detail: { caseType: 'Money Mule' }
                     }));
                   }, 600);
                 }}
-                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer inline-flex items-center gap-1"
               >
                 Investigate →
               </button>
