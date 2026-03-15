@@ -439,6 +439,11 @@ export default function Investigation() {
 
   const handleKYC = async () => {
     setKycLoading(true);
+    // Optimistic state update — same pattern as handleBlock
+    setCases(prev => prev.map(c =>
+      c.$id === selectedCase.$id ? { ...c, status: 'KYC_REQUESTED' } : c
+    ));
+    setSelectedCase(prev => ({ ...prev, status: 'KYC_REQUESTED' }));
     try {
       await api.updateCase(selectedCase.$id, {
         status: 'KYC_REQUESTED',
@@ -451,10 +456,6 @@ export default function Investigation() {
         details: `KYC reverification requested for ${selectedCase.id} (${selectedCase.type})`,
         rbi_reference: 'RBI/2020-21/44',
       });
-      setCases(prev => prev.map(c =>
-        c.$id === selectedCase.$id ? { ...c, status: 'KYC_REQUESTED' } : c
-      ));
-      setSelectedCase(prev => ({ ...prev, status: 'KYC_REQUESTED' }));
     } catch (e) {
       console.error('KYC request failed:', e);
     } finally {
@@ -792,19 +793,22 @@ export default function Investigation() {
                     {rec.action.includes('KYC') ? (
                       <button
                         onClick={handleKYC}
-                        disabled={kycLoading || kycDone}
+                        disabled={kycLoading || kycDone || selectedCase.status === 'KYC_REQUESTED'}
+                        style={{ position: 'relative', zIndex: 10 }}
                         className={`px-4 py-1.5 rounded-lg text-sm font-medium
                                    transition-colors flex items-center gap-2 min-w-[80px] justify-center
-                                   text-white ${rec.urgency === 'HIGH'
-                            ? 'bg-rose-500 hover:bg-rose-600 disabled:opacity-60'
-                            : rec.urgency === 'MEDIUM'
-                              ? 'bg-amber-500 hover:bg-amber-600 disabled:opacity-60'
-                              : 'bg-blue-500 hover:bg-blue-600 disabled:opacity-60'
+                                   text-white ${(kycDone || selectedCase.status === 'KYC_REQUESTED')
+                            ? 'bg-emerald-600 cursor-default opacity-80'
+                            : rec.urgency === 'HIGH'
+                              ? 'bg-rose-500 hover:bg-rose-600 disabled:opacity-60'
+                              : rec.urgency === 'MEDIUM'
+                                ? 'bg-amber-500 hover:bg-amber-600 disabled:opacity-60'
+                                : 'bg-blue-500 hover:bg-blue-600 disabled:opacity-60'
                           }`}
                       >
                         {kycLoading
                           ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : kycDone
+                          : (kycDone || selectedCase.status === 'KYC_REQUESTED')
                             ? '✓ Sent'
                             : 'Execute'}
                       </button>
@@ -815,14 +819,20 @@ export default function Investigation() {
                           rec.urgency === 'MEDIUM' ? handleFlagForReview :
                           handleEscalate
                         }
+                        disabled={['BLOCKED', 'REVIEW', 'ESCALATED', 'KYC_REQUESTED', 'VERIFIED'].includes(selectedCase.status)}
+                        style={{ position: 'relative', zIndex: 10 }}
                         className={`px-4 py-1.5 rounded-lg text-sm font-medium
-                                    text-white transition-colors ${rec.urgency === 'HIGH'
-                            ? 'bg-rose-500 hover:bg-rose-600'
-                            : rec.urgency === 'MEDIUM'
-                              ? 'bg-amber-500 hover:bg-amber-600'
-                              : 'bg-blue-500 hover:bg-blue-600'
+                                    text-white transition-colors ${['BLOCKED', 'REVIEW', 'ESCALATED', 'VERIFIED'].includes(selectedCase.status)
+                            ? 'bg-emerald-600 cursor-default opacity-80'
+                            : rec.urgency === 'HIGH'
+                              ? 'bg-rose-500 hover:bg-rose-600'
+                              : rec.urgency === 'MEDIUM'
+                                ? 'bg-amber-500 hover:bg-amber-600'
+                                : 'bg-blue-500 hover:bg-blue-600'
                           }`}>
-                        Execute
+                        {['BLOCKED', 'REVIEW', 'ESCALATED', 'VERIFIED'].includes(selectedCase.status)
+                          ? `✓ ${selectedCase.status.charAt(0) + selectedCase.status.slice(1).toLowerCase()}`
+                          : 'Execute'}
                       </button>
                     )}
                   </div>

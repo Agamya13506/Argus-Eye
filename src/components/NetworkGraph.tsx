@@ -338,10 +338,13 @@ export default function NetworkGraph({ onNavigate }: NetworkGraphProps) {
               </p>
               <button
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('investigationSelect', {
-                    detail: { caseType: 'Money Mule' }
-                  }));
                   onNavigate?.('investigation');
+                  // Delay event dispatch so Investigation has time to mount and register its listener
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('investigationSelect', {
+                      detail: { caseType: 'Money Mule' }
+                    }));
+                  }, 600);
                 }}
                 className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
               >
